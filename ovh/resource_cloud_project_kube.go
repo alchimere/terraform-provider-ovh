@@ -15,6 +15,8 @@ import (
 )
 
 const (
+	kubeClusterLoadBalancersSubnetIdKey       = "load_balancers_subnet_id"
+	kubeClusterNodesSubnetIdKey               = "nodes_subnet_id"
 	kubeClusterNameKey                        = "name"
 	kubeClusterPrivateNetworkIDKey            = "private_network_id"
 	kubeClusterPrivateNetworkConfigurationKey = "private_network_configuration"
@@ -248,6 +250,8 @@ func resourceCloudProjectKube() *schema.Resource {
 				Type:     schema.TypeString,
 				Optional: true,
 				ForceNew: true,
+				// private_network_id is required when load_balancers_subnet_id is set
+				RequiredWith: []string{kubeClusterLoadBalancersSubnetIdKey},
 			},
 			kubeClusterProxyModeKey: {
 				Type:         schema.TypeString,
@@ -274,6 +278,15 @@ func resourceCloudProjectKube() *schema.Resource {
 						},
 					},
 				},
+			},
+			kubeClusterLoadBalancersSubnetIdKey: {
+				Type:     schema.TypeString,
+				Optional: true,
+			},
+			kubeClusterNodesSubnetIdKey: {
+				Type:     schema.TypeString,
+				Computed: true,
+				Optional: true,
 			},
 			"region": {
 				Type:     schema.TypeString,
@@ -614,6 +627,19 @@ func resourceCloudProjectKubeUpdate(d *schema.ResourceData, meta interface{}) er
 		endpoint := fmt.Sprintf("/cloud/project/%s/kube/%s/updatePolicy", serviceName, d.Id())
 		err := config.OVHClient.Put(endpoint, CloudProjectKubeUpdatePolicyOpts{
 			UpdatePolicy: value,
+		}, nil)
+		if err != nil {
+			return err
+		}
+	}
+
+	if d.HasChange(kubeClusterLoadBalancersSubnetIdKey) {
+		_, newValue := d.GetChange(kubeClusterLoadBalancersSubnetIdKey)
+		value := newValue.(string)
+
+		endpoint := fmt.Sprintf("/cloud/project/%s/kube/%s/updateLoadBalancersSubnetId", serviceName, d.Id())
+		err := config.OVHClient.Put(endpoint, CloudProjectKubeUpdateLoadBalancersSubnetIdOpts{
+			LoadBalancersSubnetId: value,
 		}, nil)
 		if err != nil {
 			return err
