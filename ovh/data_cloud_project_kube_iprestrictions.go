@@ -1,58 +1,114 @@
 package ovh
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/url"
+	"os"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"github.com/ovh/terraform-provider-ovh/v2/ovh/helpers"
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	ovhtypes "github.com/ovh/terraform-provider-ovh/v2/ovh/types"
 )
 
-func dataSourceCloudProjectKubeIPRestrictions() *schema.Resource {
-	return &schema.Resource{
-		Read: dataSourceCloudProjectKubeIpRestrictionsRead,
-		Schema: map[string]*schema.Schema{
-			"service_name": {
-				Type:        schema.TypeString,
+type cloudProjectKubeIPRestrictionsDataSource struct {
+	config *Config
+}
+
+type cloudProjectKubeIPRestrictionsModel struct {
+	ServiceName ovhtypes.TfStringValue                             `tfsdk:"service_name"`
+	KubeId      ovhtypes.TfStringValue                             `tfsdk:"kube_id"`
+	IPs         ovhtypes.TfListNestedValue[ovhtypes.TfStringValue] `tfsdk:"ips"`
+}
+
+func NewCloudProjectKubeIPRestrictionsDataSource() datasource.DataSource {
+	return &cloudProjectKubeIPRestrictionsDataSource{}
+}
+
+// Ensure the implementation satisfies the expected interfaces.
+var (
+	_ datasource.DataSource              = &cloudProjectKubeIPRestrictionsDataSource{}
+	_ datasource.DataSourceWithConfigure = &cloudProjectKubeIPRestrictionsDataSource{}
+)
+
+func (d *cloudProjectKubeIPRestrictionsDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_cloud_project_kube_iprestrictions"
+}
+
+func (d *cloudProjectKubeIPRestrictionsDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	if req.ProviderData == nil {
+		return
+	}
+
+	config, ok := req.ProviderData.(*Config)
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Unexpected Data Source Configure Type",
+			fmt.Sprintf("Expected *Config, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+		)
+		return
+	}
+
+	d.config = config
+}
+
+func (d *cloudProjectKubeIPRestrictionsDataSource) Schema(ctx context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		Attributes: map[string]schema.Attribute{
+			"service_name": schema.StringAttribute{
+				CustomType:  ovhtypes.TfStringType{},
+				Required:    os.Getenv("OVH_CLOUD_PROJECT_SERVICE") == "",
+				Optional:    os.Getenv("OVH_CLOUD_PROJECT_SERVICE") != "",
 				Description: "Service name",
-				Required:    true,
-				ForceNew:    true,
-				DefaultFunc: schema.EnvDefaultFunc("OVH_CLOUD_PROJECT_SERVICE", nil),
 			},
-			"kube_id": {
-				Type:        schema.TypeString,
+			"kube_id": schema.StringAttribute{
+				CustomType:  ovhtypes.TfStringType{},
+				Required:    true,
 				Description: "Kube ID",
-				Required:    true,
-				ForceNew:    true,
 			},
-			"ips": {
-				Type:        schema.TypeSet,
-				Elem:        &schema.Schema{Type: schema.TypeString},
-				Set:         schema.HashString,
-				Description: "List of IP restrictions for the cluster",
+			"ips": schema.ListAttribute{
+				CustomType:  ovhtypes.NewTfListNestedType[ovhtypes.TfStringValue](ctx),
 				Computed:    true,
+				Description: "List of IP restrictions for the cluster",
 			},
 		},
 	}
 }
 
-func dataSourceCloudProjectKubeIpRestrictionsRead(d *schema.ResourceData, meta interface{}) error {
-	config := meta.(*Config)
-	serviceName := d.Get("service_name").(string)
-	kubeId := d.Get("kube_id").(string)
+func (d *cloudProjectKubeIPRestrictionsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	var data cloudProjectKubeIPRestrictionsModel
 
-	endpoint := fmt.Sprintf("/cloud/project/%s/kube/%s/ipRestrictions", url.PathEscape(serviceName), url.PathEscape(kubeId))
-	var res CloudProjectKubeIpRestrictionsResponse
+	// Read Terraform configuration data into the model
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
-	log.Printf("[DEBUG] Will read iprestrictions from cluster %s in project %s", kubeId, serviceName)
-	if err := config.OVHClient.Get(endpoint, &res); err != nil {
-		return helpers.CheckDeleted(d, err, endpoint)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
-	d.SetId(kubeId)
-	d.Set("ips", res)
+	if data.ServiceName.IsNull() {
+		data.ServiceName = ovhtypes.NewTfStringValue(os.Getenv("OVH_CLOUD_PROJECT_SERVICE"))
+	}
 
-	log.Printf("[DEBUG] Read iprestrictions: %+v", res)
-	return nil
+	// Read API call logic
+	endpoint := fmt.Sprintf("/cloud/project/%s/kube/%s/ipRestrictions",
+		url.PathEscape(data.ServiceName.ValueString()),
+		url.PathEscape(data.KubeId.ValueString()),
+	)
+
+	log.Printf("[DEBUG] Will read iprestrictions from cluster %s in project %s",
+		data.KubeId.ValueString(), data.ServiceName.ValueString())
+
+	if err := d.config.OVHClient.GetWithContext(ctx, endpoint, &data.IPs); err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to get kube IP restrictions",
+			fmt.Sprintf("error calling GET %s: %s", endpoint, err),
+		)
+		return
+	}
+
+	log.Printf("[DEBUG] Read iprestrictions: %+v", data.IPs)
+
+	// Save data into Terraform state
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
