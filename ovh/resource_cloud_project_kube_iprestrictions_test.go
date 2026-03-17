@@ -53,7 +53,7 @@ func TestAccCloudProjectKubeIpRestrictions_basic(t *testing.T) {
 			testAccCheckCloudProjectExists(t)
 			testAccPreCheckKubernetes(t)
 		},
-		Providers: testAccProviders,
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: config1,

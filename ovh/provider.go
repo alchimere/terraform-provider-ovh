@@ -249,7 +249,6 @@ func Provider() *schema.Provider {
 			"ovh_cloud_project_kube":                                         resourceCloudProjectKube(),
 			"ovh_cloud_project_kube_nodepool":                                resourceCloudProjectKubeNodePool(),
 			"ovh_cloud_project_kube_oidc":                                    resourceCloudProjectKubeOIDC(),
-			"ovh_cloud_project_kube_iprestrictions":                          resourceCloudProjectKubeIpRestrictions(),
 			"ovh_cloud_project_network_private":                              resourceCloudProjectNetworkPrivate(),
 			"ovh_cloud_project_network_private_subnet":                       resourceCloudProjectNetworkPrivateSubnet(),
 			"ovh_cloud_project_network_private_subnet_v2":                    resourceCloudProjectNetworkPrivateSubnetV2(),
