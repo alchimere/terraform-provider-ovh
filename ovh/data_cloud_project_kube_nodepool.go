@@ -1,254 +1,134 @@
 package ovh
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"math/big"
+	"net/url"
+	"os"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"github.com/ovh/terraform-provider-ovh/v2/ovh/helpers"
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	ovhtypes "github.com/ovh/terraform-provider-ovh/v2/ovh/types"
 )
 
-func dataSourceCloudProjectKubeNodepool() *schema.Resource {
-	return &schema.Resource{
-		Read: dataSourceCloudProjectKubeNodePoolRead,
-		Schema: map[string]*schema.Schema{
-			"service_name": {
-				Type:        schema.TypeString,
-				Description: "Service name",
-				Required:    true,
-				DefaultFunc: schema.EnvDefaultFunc("OVH_CLOUD_PROJECT_SERVICE", nil),
-			},
-			"kube_id": {
-				Type:        schema.TypeString,
-				Description: "Kube ID",
-				Required:    true,
-			},
-			"name": {
-				Type:        schema.TypeString,
-				Description: "NodePool resource name",
-				Required:    true,
-			},
-
-			// computed
-			"autoscale": {
-				Type:        schema.TypeBool,
-				Description: "Enable auto-scaling for the pool",
-				Computed:    true,
-			},
-			"anti_affinity": {
-				Type:        schema.TypeBool,
-				Description: "Enable anti affinity groups for nodes in the pool",
-				Computed:    true,
-			},
-			"flavor_name": {
-				Type:        schema.TypeString,
-				Description: "Flavor name",
-				Computed:    true,
-			},
-			"desired_nodes": {
-				Type:        schema.TypeInt,
-				Description: "Number of nodes you desire in the pool",
-				Computed:    true,
-			},
-			"max_nodes": {
-				Type:        schema.TypeInt,
-				Description: "Number of nodes you desire in the pool",
-				Computed:    true,
-			},
-			"min_nodes": {
-				Type:        schema.TypeInt,
-				Description: "Number of nodes you desire in the pool",
-				Computed:    true,
-			},
-			"monthly_billed": {
-				Type:        schema.TypeBool,
-				Description: "Enable monthly billing on all nodes in the pool",
-				Computed:    true,
-			},
-			"available_nodes": {
-				Type:        schema.TypeInt,
-				Description: "Number of nodes which are actually ready in the pool",
-				Computed:    true,
-			},
-			"created_at": {
-				Type:        schema.TypeString,
-				Description: "Creation date",
-				Computed:    true,
-			},
-			"current_nodes": {
-				Type:        schema.TypeInt,
-				Description: "Number of nodes present in the pool",
-				Computed:    true,
-			},
-			"flavor": {
-				Type:        schema.TypeString,
-				Description: "Flavor name",
-				Computed:    true,
-			},
-			"project_id": {
-				Type:        schema.TypeString,
-				Description: "Project id",
-				Computed:    true,
-			},
-			"size_status": {
-				Type:        schema.TypeString,
-				Description: "Status describing the state between number of nodes wanted and available ones",
-				Computed:    true,
-			},
-			"status": {
-				Type:        schema.TypeString,
-				Description: "Current status",
-				Computed:    true,
-			},
-			"up_to_date_nodes": {
-				Type:        schema.TypeInt,
-				Description: "Number of nodes with latest version installed in the pool",
-				Computed:    true,
-			},
-			"updated_at": {
-				Type:        schema.TypeString,
-				Description: "Last update date",
-				Computed:    true,
-			},
-			"autoscaling_scale_down_unneeded_time_seconds": {
-				Type:        schema.TypeInt,
-				Description: "scaleDownUnneededTimeSeconds for autoscaling",
-				Computed:    true,
-			},
-			"autoscaling_scale_down_unready_time_seconds": {
-				Type:        schema.TypeInt,
-				Description: "scaleDownUnreadyTimeSeconds for autoscaling",
-				Computed:    true,
-			},
-			"autoscaling_scale_down_utilization_threshold": {
-				Type:        schema.TypeFloat,
-				Description: "scaleDownUtilizationThreshold for autoscaling",
-				Computed:    true,
-			},
-			"template": {
-				Description: "Node pool template",
-				Optional:    true,
-				Type:        schema.TypeSet,
-				MaxItems:    1,
-				Set: func(i interface{}) int {
-					out := fmt.Sprintf("%#v", i)
-					hash := int(schema.HashString(out))
-					return hash
-				},
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"metadata": {
-							Description: "metadata",
-							Optional:    true,
-							Type:        schema.TypeSet,
-							MaxItems:    1,
-							Set: func(i interface{}) int {
-								out := fmt.Sprintf("%#v", i)
-								hash := int(schema.HashString(out))
-								return hash
-							},
-							Elem: &schema.Resource{
-								Schema: map[string]*schema.Schema{
-									"finalizers": {
-										Description: "finalizers",
-										Optional:    true,
-										Type:        schema.TypeList,
-										Elem:        &schema.Schema{Type: schema.TypeString},
-									},
-									"labels": {
-										Description: "labels",
-										Optional:    true,
-										Type:        schema.TypeMap,
-										Elem:        &schema.Schema{Type: schema.TypeString},
-										Set:         schema.HashString,
-									},
-									"annotations": {
-										Description: "annotations",
-										Optional:    true,
-										Type:        schema.TypeMap,
-										Elem:        &schema.Schema{Type: schema.TypeString},
-										Set:         schema.HashString,
-									},
-								},
-							},
-						},
-						"spec": {
-							Description: "spec",
-							Optional:    true,
-							Type:        schema.TypeSet,
-							MaxItems:    1,
-							Set: func(i interface{}) int {
-								out := fmt.Sprintf("%#v", i)
-								hash := int(schema.HashString(out))
-								return hash
-							},
-							Elem: &schema.Resource{
-								Schema: map[string]*schema.Schema{
-									"unschedulable": {
-										Description: "unschedulable",
-										Optional:    true,
-										Type:        schema.TypeBool,
-									},
-									"taints": {
-										Description: "taints",
-										Optional:    true,
-										Type:        schema.TypeList,
-										Elem: &schema.Schema{
-											Type: schema.TypeMap,
-											Set:  schema.HashString,
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			"availability_zones": {
-				Type:     schema.TypeList,
-				Optional: true,
-				Elem: &schema.Schema{
-					Type: schema.TypeString,
-				},
-			},
-		},
-	}
+type cloudProjectKubeNodePoolDataSource struct {
+	config *Config
 }
 
-func dataSourceCloudProjectKubeNodePoolRead(d *schema.ResourceData, meta interface{}) error {
-	config := meta.(*Config)
-	serviceName := d.Get("service_name").(string)
-	kubeId := d.Get("kube_id").(string)
-	nodepoolName := d.Get("name").(string)
+func NewCloudProjectKubeNodePoolDataSource() datasource.DataSource {
+	return &cloudProjectKubeNodePoolDataSource{}
+}
 
-	endpoint := fmt.Sprintf("/cloud/project/%s/kube/%s/nodepool", serviceName, kubeId)
-	var res []CloudProjectKubeNodePoolResponse
-	log.Printf("[DEBUG] Will read nodepools from cluster %s in project %s", kubeId, serviceName)
-	if err := config.OVHClient.Get(endpoint, &res); err != nil {
-		return helpers.CheckDeleted(d, err, endpoint)
+// Ensure the implementation satisfies the expected interfaces.
+var (
+	_ datasource.DataSource              = &cloudProjectKubeNodePoolDataSource{}
+	_ datasource.DataSourceWithConfigure = &cloudProjectKubeNodePoolDataSource{}
+)
+
+func (d *cloudProjectKubeNodePoolDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_cloud_project_kube_nodepool"
+}
+
+func (d *cloudProjectKubeNodePoolDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	if req.ProviderData == nil {
+		return
 	}
 
-	var nodepoolTarget *CloudProjectKubeNodePoolResponse
+	config, ok := req.ProviderData.(*Config)
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Unexpected Data Source Configure Type",
+			fmt.Sprintf("Expected *Config, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+		)
+		return
+	}
 
-	for _, nodepool := range res {
-		if nodepool.Name == nodepoolName {
-			nodepoolTarget = &nodepool
+	d.config = config
+}
+
+func (d *cloudProjectKubeNodePoolDataSource) Schema(ctx context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = CloudProjectKubeNodePoolDataSourceSchema(ctx)
+}
+
+func (d *cloudProjectKubeNodePoolDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	var data CloudProjectKubeNodePoolDataSourceModel
+
+	// Read Terraform configuration data into the model
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if data.ServiceName.IsNull() {
+		data.ServiceName = ovhtypes.NewTfStringValue(os.Getenv("OVH_CLOUD_PROJECT_SERVICE"))
+	}
+
+	serviceName := data.ServiceName.ValueString()
+	kubeId := data.KubeId.ValueString()
+	nodepoolName := data.Name.ValueString()
+
+	// Read API call logic — fetch all nodepools and filter by name
+	endpoint := fmt.Sprintf("/cloud/project/%s/kube/%s/nodepool",
+		url.PathEscape(serviceName),
+		url.PathEscape(kubeId),
+	)
+
+	log.Printf("[DEBUG] Will read nodepools from cluster %s in project %s", kubeId, serviceName)
+
+	var res []CloudProjectKubeNodePoolDataSourceModel
+	if err := d.config.OVHClient.GetWithContext(ctx, endpoint, &res); err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to get kube nodepools",
+			fmt.Sprintf("error calling GET %s: %s", endpoint, err),
+		)
+		return
+	}
+
+	// Find the nodepool matching the requested name
+	var nodepoolTarget *CloudProjectKubeNodePoolDataSourceModel
+	for i := range res {
+		if res[i].Name.ValueString() == nodepoolName {
+			nodepoolTarget = &res[i]
 			break
 		}
 	}
 
 	if nodepoolTarget == nil {
-		return fmt.Errorf("the nodepool named %s cannot be found for cluster %s in project %s", nodepoolName, kubeId, serviceName)
+		resp.Diagnostics.AddError(
+			"Nodepool not found",
+			fmt.Sprintf("the nodepool named %s cannot be found for cluster %s in project %s", nodepoolName, kubeId, serviceName),
+		)
+		return
 	}
 
-	for k, v := range nodepoolTarget.ToMap() {
-		if k != "id" {
-			d.Set(k, v)
-		} else {
-			d.SetId(fmt.Sprint(v))
+	// Copy deserialized data from the matched nodepool
+	data = *nodepoolTarget
+
+	// flavor_name is a copy of flavor (same field from API)
+	data.FlavorName = nodepoolTarget.Flavor
+
+	// Flatten the nested autoscaling object into top-level attributes
+	autoscaling := nodepoolTarget.Autoscaling
+	if autoscaling.ScaleDownUnneededTimeSeconds != nil {
+		data.AutoscalingScaleDownUnneededTimeSeconds = ovhtypes.TfInt64Value{
+			Int64Value: basetypes.NewInt64Value(*autoscaling.ScaleDownUnneededTimeSeconds),
+		}
+	}
+	if autoscaling.ScaleDownUnreadyTimeSeconds != nil {
+		data.AutoscalingScaleDownUnreadyTimeSeconds = ovhtypes.TfInt64Value{
+			Int64Value: basetypes.NewInt64Value(*autoscaling.ScaleDownUnreadyTimeSeconds),
+		}
+	}
+	if autoscaling.ScaleDownUtilizationThreshold != nil {
+		data.AutoscalingScaleDownUtilizationThreshold = ovhtypes.TfNumberValue{
+			NumberValue: basetypes.NewNumberValue(big.NewFloat(*autoscaling.ScaleDownUtilizationThreshold)),
 		}
 	}
 
-	log.Printf("[DEBUG] Read nodepool: %+v", res)
-	return nil
+	log.Printf("[DEBUG] Read nodepool: %+v", nodepoolTarget)
+
+	// Save data into Terraform state
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
