@@ -147,7 +147,6 @@ func Provider() *schema.Provider {
 			"ovh_cloud_project_instance":                                     dataSourceCloudProjectInstance(),
 			"ovh_cloud_project_instances":                                    dataSourceCloudProjectInstances(),
 			"ovh_cloud_project_kube":                                         dataSourceCloudProjectKube(),
-			"ovh_cloud_project_kube_nodepool_nodes":                          dataSourceCloudProjectKubeNodepoolNodes(),
 			"ovh_cloud_project_kube_oidc":                                    dataSourceCloudProjectKubeOIDC(),
 			"ovh_cloud_project_region_loadbalancer_log_subscriptions":        dataSourceCloudProjectRegionLoadbalancerLogSubscriptions(),
 			"ovh_cloud_project_region_loadbalancer_log_subscription":         dataSourceCloudProjectRegionLoadbalancerLogSubscription(),

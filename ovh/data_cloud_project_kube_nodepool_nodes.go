@@ -1,122 +1,84 @@
 package ovh
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/url"
+	"os"
 	"sort"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"github.com/ovh/terraform-provider-ovh/v2/ovh/helpers"
-	"github.com/ovh/terraform-provider-ovh/v2/ovh/helpers/hashcode"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	ovhtypes "github.com/ovh/terraform-provider-ovh/v2/ovh/types"
 )
 
-func dataSourceCloudProjectKubeNodepoolNodes() *schema.Resource {
-	return &schema.Resource{
-		Read: dataSourceCloudProjectKubeNodePoolNodesRead,
-		Schema: map[string]*schema.Schema{
-			"service_name": {
-				Type:        schema.TypeString,
-				Description: "Service name",
-				Required:    true,
-				DefaultFunc: schema.EnvDefaultFunc("OVH_CLOUD_PROJECT_SERVICE", nil),
-			},
-			"kube_id": {
-				Type:        schema.TypeString,
-				Description: "Kube ID",
-				Required:    true,
-			},
-			"name": {
-				Type:        schema.TypeString,
-				Description: "NodePool resource name",
-				Required:    true,
-			},
-
-			// Computed
-			"nodes": {
-				Type:        schema.TypeList,
-				Description: "Nodes composing the node pool",
-				Computed:    true,
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"created_at": {
-							Type:        schema.TypeString,
-							Description: "Creation date",
-							Computed:    true,
-						},
-						"deployed_at": {
-							Type:        schema.TypeString,
-							Description: "Node deployment date",
-							Computed:    true,
-						},
-						"flavor": {
-							Type:        schema.TypeString,
-							Description: "Flavor name",
-							Computed:    true,
-						},
-						"id": {
-							Type:        schema.TypeString,
-							Description: "Node ID",
-							Computed:    true,
-						},
-						"instance_id": {
-							Type:        schema.TypeString,
-							Description: "Public Cloud instance ID",
-							Computed:    true,
-						},
-						"is_up_to_date": {
-							Type:        schema.TypeBool,
-							Description: "True if the node is up to date",
-							Computed:    true,
-						},
-						"name": {
-							Type:        schema.TypeString,
-							Description: "Node name",
-							Computed:    true,
-						},
-						"node_pool_id": {
-							Type:        schema.TypeString,
-							Description: "NodePool parent ID",
-							Computed:    true,
-						},
-						"project_id": {
-							Type:        schema.TypeString,
-							Description: "Project ID",
-							Computed:    true,
-						},
-						"status": {
-							Type:        schema.TypeString,
-							Description: "Current status",
-							Computed:    true,
-						},
-						"updated_at": {
-							Type:        schema.TypeString,
-							Description: "Last update date",
-							Computed:    true,
-						},
-						"version": {
-							Type:        schema.TypeString,
-							Description: "Node version",
-							Computed:    true,
-						},
-					},
-				},
-			},
-		},
-	}
+type cloudProjectKubeNodepoolNodesDataSource struct {
+	config *Config
 }
 
-func dataSourceCloudProjectKubeNodePoolNodesRead(d *schema.ResourceData, meta interface{}) error {
-	config := meta.(*Config)
-	serviceName := d.Get("service_name").(string)
-	kubeId := d.Get("kube_id").(string)
-	name := d.Get("name").(string)
+func NewCloudProjectKubeNodepoolNodesDataSource() datasource.DataSource {
+	return &cloudProjectKubeNodepoolNodesDataSource{}
+}
+
+// Ensure the implementation satisfies the expected interfaces.
+var (
+	_ datasource.DataSource              = &cloudProjectKubeNodepoolNodesDataSource{}
+	_ datasource.DataSourceWithConfigure = &cloudProjectKubeNodepoolNodesDataSource{}
+)
+
+func (d *cloudProjectKubeNodepoolNodesDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_cloud_project_kube_nodepool_nodes"
+}
+
+func (d *cloudProjectKubeNodepoolNodesDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	if req.ProviderData == nil {
+		return
+	}
+
+	config, ok := req.ProviderData.(*Config)
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Unexpected Data Source Configure Type",
+			fmt.Sprintf("Expected *Config, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+		)
+		return
+	}
+
+	d.config = config
+}
+
+func (d *cloudProjectKubeNodepoolNodesDataSource) Schema(ctx context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = CloudProjectKubeNodepoolNodesDataSourceSchema(ctx)
+}
+
+func (d *cloudProjectKubeNodepoolNodesDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	var data CloudProjectKubeNodepoolNodesDataSourceModel
+
+	// Read Terraform configuration data into the model
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if data.ServiceName.IsNull() {
+		data.ServiceName = ovhtypes.NewTfStringValue(os.Getenv("OVH_CLOUD_PROJECT_SERVICE"))
+	}
+
+	serviceName := data.ServiceName.ValueString()
+	kubeId := data.KubeId.ValueString()
+	name := data.Name.ValueString()
 
 	endpointNodepool := fmt.Sprintf("/cloud/project/%s/kube/%s/nodepool", serviceName, kubeId)
 	var nodePoolRes []CloudProjectKubeNodePoolResponse
 	log.Printf("[DEBUG] Will read nodepools from cluster %s in project %s", kubeId, serviceName)
-	if err := config.OVHClient.Get(endpointNodepool, &nodePoolRes); err != nil {
-		return helpers.CheckDeleted(d, err, endpointNodepool)
+	if err := d.config.OVHClient.GetWithContext(ctx, endpointNodepool, &nodePoolRes); err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to get nodepools",
+			fmt.Sprintf("error calling GET %s: %s", endpointNodepool, err),
+		)
+		return
 	}
 
 	var nodepoolTarget *CloudProjectKubeNodePoolResponse
@@ -129,7 +91,11 @@ func dataSourceCloudProjectKubeNodePoolNodesRead(d *schema.ResourceData, meta in
 	}
 
 	if nodepoolTarget == nil {
-		return fmt.Errorf("The nodepool named %s cannot be found for cluster %s in project %s", name, kubeId, serviceName)
+		resp.Diagnostics.AddError(
+			"Nodepool not found",
+			fmt.Sprintf("The nodepool named %s cannot be found for cluster %s in project %s", name, kubeId, serviceName),
+		)
+		return
 	}
 
 	endpointNodepoolNodes := fmt.Sprintf("/cloud/project/%s/kube/%s/nodepool/%s/nodes",
@@ -139,24 +105,51 @@ func dataSourceCloudProjectKubeNodePoolNodesRead(d *schema.ResourceData, meta in
 	var resNodepoolNodes []CloudProjectKubeNodeResponse
 
 	log.Printf("[DEBUG] Will read nodes from node pool %s and cluster %s in project %s", name, kubeId, serviceName)
-	if err := config.OVHClient.Get(endpointNodepoolNodes, &resNodepoolNodes); err != nil {
-		return helpers.CheckDeleted(d, err, endpointNodepoolNodes)
+	if err := d.config.OVHClient.GetWithContext(ctx, endpointNodepoolNodes, &resNodepoolNodes); err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to get nodepool nodes",
+			fmt.Sprintf("error calling GET %s: %s", endpointNodepoolNodes, err),
+		)
+		return
 	}
 
-	nodes := make([]map[string]interface{}, len(resNodepoolNodes))
+	nodes := make([]CloudProjectKubeNodeValue, len(resNodepoolNodes))
 	ids := make([]string, len(resNodepoolNodes))
 
 	for i, node := range resNodepoolNodes {
-		nodes[i] = node.ToMap()
+		nodes[i] = CloudProjectKubeNodeValue{
+			CreatedAt:  ovhtypes.NewTfStringValue(node.CreatedAt),
+			UpdatedAt:  ovhtypes.NewTfStringValue(node.UpdatedAt),
+			DeployedAt: ovhtypes.NewTfStringValue(node.DeployedAt),
+			Flavor:     ovhtypes.NewTfStringValue(node.Flavor),
+			Id:         ovhtypes.NewTfStringValue(node.Id),
+			InstanceId: ovhtypes.NewTfStringValue(node.InstanceId),
+			IsUpToDate: ovhtypes.NewTfBoolValue(node.IsUpToDate),
+			Name:       ovhtypes.NewTfStringValue(node.Name),
+			NodePoolId: ovhtypes.NewTfStringValue(node.NodePoolId),
+			ProjectId:  ovhtypes.NewTfStringValue(node.ProjectId),
+			Status:     ovhtypes.NewTfStringValue(node.Status),
+			Version:    ovhtypes.NewTfStringValue(node.Version),
+			state:      attr.ValueStateKnown,
+		}
 		ids = append(ids, node.Id)
 	}
 
 	// sort.Strings sorts in place, returns nothing
 	sort.Strings(ids)
 
-	d.SetId(hashcode.Strings(ids))
-	d.Set("nodes", nodes)
+	// Convert nodes to attr.Value slice
+	nodeValues := make([]attr.Value, len(nodes))
+	for i, node := range nodes {
+		nodeValues[i] = node
+	}
+
+	data.Nodes = ovhtypes.TfListNestedValue[CloudProjectKubeNodeValue]{
+		ListValue: basetypes.NewListValueMust(CloudProjectKubeNodeValue{}.Type(ctx), nodeValues),
+	}
 
 	log.Printf("[DEBUG] Read nodepool nodes: %+v", resNodepoolNodes)
-	return nil
+
+	// Save data into Terraform state
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

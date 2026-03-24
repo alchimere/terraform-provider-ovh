@@ -237,6 +237,7 @@ func (p *OvhProvider) DataSources(_ context.Context) []func() datasource.DataSou
 		NewCloudProjectImagesDataSource,
 		NewCloudProjectKubeIPRestrictionsDataSource,
 		NewCloudProjectKubeNodePoolDataSource,
+		NewCloudProjectKubeNodepoolNodesDataSource,
 		NewCloudProjectKubeNodesDataSource,
 		NewCloudProjectLoadbalancerDataSource,
 		NewCloudProjectLoadbalancersDataSource,
