@@ -313,15 +313,21 @@ func (r *cloudProjectKubeResource) Schema(ctx context.Context, _ resource.Schema
 			},
 			"private_network_configuration": schema.SingleNestedBlock{
 				Description: "Private network configuration",
+				Validators: []validator.Object{
+					ovhvalidators.RequireAttributesWhenBlockPresent(
+						"default_vrack_gateway",
+						"private_network_routing_as_default",
+					),
+				},
 				Attributes: map[string]schema.Attribute{
 					"default_vrack_gateway": schema.StringAttribute{
 						CustomType:  ovhtypes.TfStringType{},
-						Required:    true,
+						Optional:    true,
 						Description: "If defined, all egress traffic will be routed towards this IP address, which should belong to the private network. Empty string means disabled.",
 					},
 					"private_network_routing_as_default": schema.BoolAttribute{
 						CustomType:  ovhtypes.TfBoolType{},
-						Required:    true,
+						Optional:    true,
 						Description: "Defines whether routing should default to using the nodes' private interface, instead of their public interface. Default is false.",
 					},
 				},
