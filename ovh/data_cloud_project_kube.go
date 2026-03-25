@@ -1,309 +1,255 @@
 package ovh
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/url"
+	"os"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"github.com/ovh/terraform-provider-ovh/v2/ovh/helpers"
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	ovhtypes "github.com/ovh/terraform-provider-ovh/v2/ovh/types"
 )
 
-func dataSourceCloudProjectKube() *schema.Resource {
-	return &schema.Resource{
-		Read: dataSourceCloudProjectKubeRead,
-		Schema: map[string]*schema.Schema{
-			"service_name": {
-				Type:        schema.TypeString,
-				Required:    true,
-				DefaultFunc: schema.EnvDefaultFunc("OVH_CLOUD_PROJECT_SERVICE", nil),
-			},
-			"kube_id": {
-				Type:     schema.TypeString,
-				Required: true,
-			},
-			"name": {
-				Type:     schema.TypeString,
-				Optional: true,
-			},
-			"version": {
-				Type:     schema.TypeString,
-				Optional: true,
-			},
-			"plan": {
-				Type:         schema.TypeString,
-				Optional:     true,
-				ForceNew:     false,
-				Default:      "free",
-				ValidateFunc: helpers.ValidateEnum([]string{"standard", "free"}),
-			},
-			kubeClusterProxyModeKey: {
-				Type:         schema.TypeString,
-				Optional:     true,
-				ForceNew:     true,
-				ValidateFunc: helpers.ValidateEnum([]string{"iptables", "ipvs"}),
-			},
-			kubeClusterCustomizationApiServerKey: {
-				Type:     schema.TypeSet,
-				Computed: true,
-				Optional: true,
-				// Required: true,
-				ForceNew: false,
-				// MaxItems: 1,
-				Set: CustomSchemaSetFunc(),
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"admissionplugins": {
-							Type:     schema.TypeSet,
-							Computed: true,
-							Optional: true,
-							// Required: true,
-							ForceNew: false,
-							// MaxItems: 1,
-							Set: CustomSchemaSetFunc(),
-							Elem: &schema.Resource{
-								Schema: map[string]*schema.Schema{
-									"enabled": {
-										Type:     schema.TypeList,
-										Computed: true,
-										Optional: true,
-										// Required: true,
-										ForceNew: false,
-										Elem:     &schema.Schema{Type: schema.TypeString},
-									},
-									"disabled": {
-										Type:     schema.TypeList,
-										Computed: true,
-										Optional: true,
-										// Required: true,
-										ForceNew: false,
-										Elem:     &schema.Schema{Type: schema.TypeString},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			kubeClusterCustomization: {
-				Type:       schema.TypeSet,
-				Computed:   true,
-				Optional:   true,
-				ForceNew:   false,
-				Set:        CustomSchemaSetFunc(),
-				Deprecated: fmt.Sprintf("Use %s instead", kubeClusterCustomizationApiServerKey),
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"apiserver": {
-							Type:       schema.TypeSet,
-							Computed:   true,
-							Optional:   true,
-							ForceNew:   false,
-							Set:        CustomSchemaSetFunc(),
-							Deprecated: fmt.Sprintf("Use %s instead", kubeClusterCustomizationApiServerKey),
-							Elem: &schema.Resource{
-								Schema: map[string]*schema.Schema{
-									"admissionplugins": {
-										Type:     schema.TypeSet,
-										Computed: true,
-										Optional: true,
-										ForceNew: false,
-										Set:      CustomSchemaSetFunc(),
-										Elem: &schema.Resource{
-											Schema: map[string]*schema.Schema{
-												"enabled": {
-													Type:     schema.TypeList,
-													Computed: true,
-													Optional: true,
-													ForceNew: false,
-													Elem:     &schema.Schema{Type: schema.TypeString},
-												},
-												"disabled": {
-													Type:     schema.TypeList,
-													Computed: true,
-													Optional: true,
-													ForceNew: false,
-													Elem:     &schema.Schema{Type: schema.TypeString},
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			kubeClusterCustomizationKubeProxyKey: {
-				Type:     schema.TypeSet,
-				Computed: false,
-				Optional: true,
-				ForceNew: false,
-				MaxItems: 1,
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"iptables": {
-							Type:     schema.TypeSet,
-							Computed: false,
-							Optional: true,
-							ForceNew: false,
-							MaxItems: 1,
-							Set:      CustomIPVSIPTablesSchemaSetFunc(),
-							Elem: &schema.Resource{
-								Schema: map[string]*schema.Schema{
-									"min_sync_period": {
-										Type:         schema.TypeString,
-										Computed:     false,
-										Optional:     true,
-										ForceNew:     false,
-										ValidateFunc: helpers.ValidateRFC3339Duration,
-									},
-									"sync_period": {
-										Type:         schema.TypeString,
-										Computed:     false,
-										Optional:     true,
-										ForceNew:     false,
-										ValidateFunc: helpers.ValidateRFC3339Duration,
-									},
-								},
-							},
-						},
-						"ipvs": {
-							Type:     schema.TypeSet,
-							Computed: false,
-							Optional: true,
-							ForceNew: false,
-							MaxItems: 1,
-							Set:      CustomIPVSIPTablesSchemaSetFunc(),
-							Elem: &schema.Resource{
-								Schema: map[string]*schema.Schema{
-									"min_sync_period": {
-										Type:         schema.TypeString,
-										Computed:     false,
-										Optional:     true,
-										ForceNew:     false,
-										ValidateFunc: helpers.ValidateRFC3339Duration,
-									},
-									"sync_period": {
-										Type:         schema.TypeString,
-										Computed:     false,
-										Optional:     true,
-										ForceNew:     false,
-										ValidateFunc: helpers.ValidateRFC3339Duration,
-									},
-									"scheduler": {
-										Type:         schema.TypeString,
-										Computed:     false,
-										Optional:     true,
-										ForceNew:     false,
-										ValidateFunc: helpers.ValidateEnum([]string{"rr", "lc", "dh", "sh", "sed", "nq"}),
-									},
-									"tcp_fin_timeout": {
-										Type:         schema.TypeString,
-										Computed:     false,
-										Optional:     true,
-										ForceNew:     false,
-										ValidateFunc: helpers.ValidateRFC3339Duration,
-									},
-									"tcp_timeout": {
-										Type:         schema.TypeString,
-										Computed:     false,
-										Optional:     true,
-										ForceNew:     false,
-										ValidateFunc: helpers.ValidateRFC3339Duration,
-									},
-									"udp_timeout": {
-										Type:         schema.TypeString,
-										Computed:     false,
-										Optional:     true,
-										ForceNew:     false,
-										ValidateFunc: helpers.ValidateRFC3339Duration,
-									},
-								},
-							},
-						},
-					},
-				},
-			},
+type cloudProjectKubeDataSource struct {
+	config *Config
+}
 
-			"private_network_id": {
-				Type:     schema.TypeString,
-				Computed: true,
+func NewCloudProjectKubeDataSource() datasource.DataSource {
+	return &cloudProjectKubeDataSource{}
+}
+
+// Ensure the implementation satisfies the expected interfaces.
+var (
+	_ datasource.DataSource              = &cloudProjectKubeDataSource{}
+	_ datasource.DataSourceWithConfigure = &cloudProjectKubeDataSource{}
+)
+
+func (d *cloudProjectKubeDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_cloud_project_kube"
+}
+
+func (d *cloudProjectKubeDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	if req.ProviderData == nil {
+		return
+	}
+
+	config, ok := req.ProviderData.(*Config)
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Unexpected Data Source Configure Type",
+			fmt.Sprintf("Expected *Config, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+		)
+		return
+	}
+
+	d.config = config
+}
+
+func (d *cloudProjectKubeDataSource) Schema(ctx context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		Attributes: map[string]schema.Attribute{
+			"service_name": schema.StringAttribute{
+				CustomType:  ovhtypes.TfStringType{},
+				Required:    os.Getenv("OVH_CLOUD_PROJECT_SERVICE") == "",
+				Optional:    os.Getenv("OVH_CLOUD_PROJECT_SERVICE") != "",
+				Description: "Service name",
 			},
-			"control_plane_is_up_to_date": {
-				Type:     schema.TypeBool,
-				Computed: true,
+			"kube_id": schema.StringAttribute{
+				CustomType:  ovhtypes.TfStringType{},
+				Required:    true,
+				Description: "Kube ID",
 			},
-			"is_up_to_date": {
-				Type:     schema.TypeBool,
-				Computed: true,
+			"name": schema.StringAttribute{
+				CustomType: ovhtypes.TfStringType{},
+				Computed:   true,
 			},
-			"next_upgrade_versions": {
-				Type:     schema.TypeSet,
-				Computed: true,
-				Elem: &schema.Schema{
-					Type: schema.TypeString,
+			"version": schema.StringAttribute{
+				CustomType: ovhtypes.TfStringType{},
+				Computed:   true,
+			},
+			"plan": schema.StringAttribute{
+				CustomType:  ovhtypes.TfStringType{},
+				Optional:    true,
+				Computed:    true,
+				Description: "Cluster plan",
+				Validators: []validator.String{
+					stringvalidator.OneOf("standard", "free"),
 				},
 			},
-			"nodes_url": {
-				Type:     schema.TypeString,
-				Computed: true,
+			"region": schema.StringAttribute{
+				CustomType: ovhtypes.TfStringType{},
+				Computed:   true,
 			},
-			"region": {
-				Type:     schema.TypeString,
-				Optional: true,
+			"kube_proxy_mode": schema.StringAttribute{
+				CustomType: ovhtypes.TfStringType{},
+				Optional:   true,
+				Computed:   true,
+				Validators: []validator.String{
+					stringvalidator.OneOf("iptables", "ipvs"),
+				},
 			},
-			"status": {
-				Type:     schema.TypeString,
-				Computed: true,
+			"private_network_id": schema.StringAttribute{
+				CustomType: ovhtypes.TfStringType{},
+				Computed:   true,
 			},
-			"update_policy": {
-				Type:     schema.TypeString,
-				Optional: true,
+			"load_balancers_subnet_id": schema.StringAttribute{
+				CustomType: ovhtypes.TfStringType{},
+				Computed:   true,
 			},
-			"url": {
-				Type:     schema.TypeString,
-				Computed: true,
+			"nodes_subnet_id": schema.StringAttribute{
+				CustomType: ovhtypes.TfStringType{},
+				Computed:   true,
 			},
-			kubeClusterLoadBalancersSubnetIdKey: {
-				Type:     schema.TypeString,
-				Computed: true,
+			"update_policy": schema.StringAttribute{
+				CustomType: ovhtypes.TfStringType{},
+				Computed:   true,
 			},
-			kubeClusterNodesSubnetIdKey: {
-				Type:     schema.TypeString,
-				Computed: true,
+			"control_plane_is_up_to_date": schema.BoolAttribute{
+				CustomType: ovhtypes.TfBoolType{},
+				Computed:   true,
 			},
-			"kubeconfig": {
-				Type:      schema.TypeString,
-				Computed:  true,
-				Sensitive: true,
+			"is_up_to_date": schema.BoolAttribute{
+				CustomType: ovhtypes.TfBoolType{},
+				Computed:   true,
 			},
-			"kubeconfig_attributes": {
-				Type:        schema.TypeList,
-				Computed:    true,
-				Sensitive:   true,
+			"next_upgrade_versions": schema.ListAttribute{
+				CustomType: ovhtypes.NewTfListNestedType[ovhtypes.TfStringValue](ctx),
+				Computed:   true,
+			},
+			"nodes_url": schema.StringAttribute{
+				CustomType: ovhtypes.TfStringType{},
+				Computed:   true,
+			},
+			"status": schema.StringAttribute{
+				CustomType: ovhtypes.TfStringType{},
+				Computed:   true,
+			},
+			"url": schema.StringAttribute{
+				CustomType: ovhtypes.TfStringType{},
+				Computed:   true,
+			},
+			"kubeconfig": schema.StringAttribute{
+				CustomType: ovhtypes.TfStringType{},
+				Computed:   true,
+				Sensitive:  true,
+			},
+		},
+		Blocks: map[string]schema.Block{
+			"customization_apiserver": schema.SingleNestedBlock{
+				Description: "Kubernetes API server customization",
+				Blocks: map[string]schema.Block{
+					"admissionplugins": schema.SingleNestedBlock{
+						Attributes: map[string]schema.Attribute{
+							"enabled": schema.ListAttribute{
+								CustomType:  ovhtypes.NewTfListNestedType[ovhtypes.TfStringValue](ctx),
+								Computed:    true,
+								Description: "Enabled admission plugins",
+							},
+							"disabled": schema.ListAttribute{
+								CustomType:  ovhtypes.NewTfListNestedType[ovhtypes.TfStringValue](ctx),
+								Computed:    true,
+								Description: "Disabled admission plugins",
+							},
+						},
+					},
+				},
+			},
+			"customization": schema.SingleNestedBlock{
+				Description:        "Kubernetes cluster customization (deprecated)",
+				DeprecationMessage: "Use customization_apiserver instead",
+				Blocks: map[string]schema.Block{
+					"apiserver": schema.SingleNestedBlock{
+						DeprecationMessage: "Use customization_apiserver instead",
+						Blocks: map[string]schema.Block{
+							"admissionplugins": schema.SingleNestedBlock{
+								Attributes: map[string]schema.Attribute{
+									"enabled": schema.ListAttribute{
+										CustomType:  ovhtypes.NewTfListNestedType[ovhtypes.TfStringValue](ctx),
+										Computed:    true,
+										Description: "Enabled admission plugins",
+									},
+									"disabled": schema.ListAttribute{
+										CustomType:  ovhtypes.NewTfListNestedType[ovhtypes.TfStringValue](ctx),
+										Computed:    true,
+										Description: "Disabled admission plugins",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			"customization_kube_proxy": schema.SingleNestedBlock{
+				Description: "Kubernetes kube-proxy customization",
+				Blocks: map[string]schema.Block{
+					"iptables": schema.SingleNestedBlock{
+						Attributes: map[string]schema.Attribute{
+							"min_sync_period": schema.StringAttribute{
+								CustomType: ovhtypes.TfStringType{},
+								Computed:   true,
+							},
+							"sync_period": schema.StringAttribute{
+								CustomType: ovhtypes.TfStringType{},
+								Computed:   true,
+							},
+						},
+					},
+					"ipvs": schema.SingleNestedBlock{
+						Attributes: map[string]schema.Attribute{
+							"min_sync_period": schema.StringAttribute{
+								CustomType: ovhtypes.TfStringType{},
+								Computed:   true,
+							},
+							"scheduler": schema.StringAttribute{
+								CustomType: ovhtypes.TfStringType{},
+								Computed:   true,
+							},
+							"sync_period": schema.StringAttribute{
+								CustomType: ovhtypes.TfStringType{},
+								Computed:   true,
+							},
+							"tcp_fin_timeout": schema.StringAttribute{
+								CustomType: ovhtypes.TfStringType{},
+								Computed:   true,
+							},
+							"tcp_timeout": schema.StringAttribute{
+								CustomType: ovhtypes.TfStringType{},
+								Computed:   true,
+							},
+							"udp_timeout": schema.StringAttribute{
+								CustomType: ovhtypes.TfStringType{},
+								Computed:   true,
+							},
+						},
+					},
+				},
+			},
+			"kubeconfig_attributes": schema.SingleNestedBlock{
 				Description: "The kubeconfig configuration file of the Kubernetes cluster",
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"host": {
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-						"cluster_ca_certificate": {
-							Type:      schema.TypeString,
-							Computed:  true,
-							Sensitive: true,
-						},
-						"client_certificate": {
-							Type:      schema.TypeString,
-							Computed:  true,
-							Sensitive: true,
-						},
-						"client_key": {
-							Type:      schema.TypeString,
-							Computed:  true,
-							Sensitive: true,
-						},
+				Attributes: map[string]schema.Attribute{
+					"host": schema.StringAttribute{
+						CustomType: ovhtypes.TfStringType{},
+						Computed:   true,
+					},
+					"cluster_ca_certificate": schema.StringAttribute{
+						CustomType: ovhtypes.TfStringType{},
+						Computed:   true,
+						Sensitive:  true,
+					},
+					"client_certificate": schema.StringAttribute{
+						CustomType: ovhtypes.TfStringType{},
+						Computed:   true,
+						Sensitive:  true,
+					},
+					"client_key": schema.StringAttribute{
+						CustomType: ovhtypes.TfStringType{},
+						Computed:   true,
+						Sensitive:  true,
 					},
 				},
 			},
@@ -311,10 +257,21 @@ func dataSourceCloudProjectKube() *schema.Resource {
 	}
 }
 
-func dataSourceCloudProjectKubeRead(d *schema.ResourceData, meta interface{}) error {
-	config := meta.(*Config)
-	serviceName := d.Get("service_name").(string)
-	kubeId := d.Get("kube_id").(string)
+func (d *cloudProjectKubeDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	var data cloudProjectKubeDataSourceModel
+
+	// Read Terraform configuration data into the model
+	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if data.ServiceName.IsNull() {
+		data.ServiceName = ovhtypes.NewTfStringValue(os.Getenv("OVH_CLOUD_PROJECT_SERVICE"))
+	}
+
+	serviceName := data.ServiceName.ValueString()
+	kubeId := data.KubeId.ValueString()
 
 	log.Printf("[DEBUG] Will read public cloud kube %s for project: %s", kubeId, serviceName)
 
@@ -324,56 +281,32 @@ func dataSourceCloudProjectKubeRead(d *schema.ResourceData, meta interface{}) er
 		url.PathEscape(serviceName),
 		url.PathEscape(kubeId),
 	)
-	if err := config.OVHClient.Get(endpoint, res); err != nil {
-		return fmt.Errorf("Error calling %s:\n\t %q", endpoint, err)
+	if err := d.config.OVHClient.GetWithContext(ctx, endpoint, res); err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to read kube cluster",
+			fmt.Sprintf("error calling GET %s: %s", endpoint, err),
+		)
+		return
 	}
 
-	for k, v := range res.ToMap(d) {
-		if k != "id" {
-			d.Set(k, v)
-		} else {
-			d.SetId(fmt.Sprint(v))
-		}
+	log.Printf("[DEBUG] Read kube %+v", res)
+
+	// Populate the model from the API response
+	diags := dataSourceModelFromResponse(ctx, res, &data)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
-	// add kubeconfig in state
-	if err := dataSourceKubeconfig(d, meta); err != nil {
-		return err
+	// Fetch kubeconfig
+	if err := setKubeconfigOnDataSourceModel(d.config, serviceName, kubeId, &data); err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to read kubeconfig",
+			fmt.Sprintf("error reading kubeconfig for kube %s: %s", kubeId, err),
+		)
+		return
 	}
 
-	return nil
-}
-
-func dataSourceKubeconfig(d *schema.ResourceData, meta interface{}) error {
-	serviceName := d.Get("service_name").(string)
-	var kubeId string
-
-	// For data source, use kube_id instead of d.Id()
-	if id := d.Get("kube_id"); id != nil {
-		kubeId = id.(string)
-	} else {
-		kubeId = d.Id()
-	}
-
-	kubeConfig, err := getKubeconfig(meta.(*Config), serviceName, kubeId)
-	if err != nil {
-		return err
-	}
-
-	if len(kubeConfig.Clusters) == 0 || len(kubeConfig.Users) == 0 {
-		return fmt.Errorf("kubeconfig is invalid")
-	}
-
-	// raw kubeconfig
-	d.Set("kubeconfig", kubeConfig.Raw)
-
-	// kubeconfig attributes
-	kubeconf := map[string]interface{}{}
-	kubeconf["host"] = kubeConfig.Clusters[0].Cluster.Server
-	kubeconf["cluster_ca_certificate"] = kubeConfig.Clusters[0].Cluster.CertificateAuthorityData
-	kubeconf["client_certificate"] = kubeConfig.Users[0].User.ClientCertificateData
-	kubeconf["client_key"] = kubeConfig.Users[0].User.ClientKeyData
-	d.Set("kubeconfig_attributes", []map[string]interface{}{kubeconf})
-
-	return nil
+	// Save data into Terraform state
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }

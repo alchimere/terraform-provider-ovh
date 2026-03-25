@@ -12,7 +12,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
@@ -231,7 +230,7 @@ func TestAccCloudProjectKubeCustomizationApiServerAdmissionPlugins(t *testing.T)
 			testAccCheckCloudProjectExists(t)
 			testAccPreCheckKubernetes(t)
 		},
-		Providers: testAccProviders,
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				// no apiserver customization, should contain default values from API
@@ -240,9 +239,9 @@ func TestAccCloudProjectKubeCustomizationApiServerAdmissionPlugins(t *testing.T)
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", kubeClusterNameKey, name),
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "region", region),
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "service_name", serviceName),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_apiserver.0.admissionplugins.0.disabled.#", "0"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_apiserver.0.admissionplugins.0.enabled.0", "AlwaysPullImages"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_apiserver.0.admissionplugins.0.enabled.1", "NodeRestriction"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_apiserver.admissionplugins.disabled.#", "0"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_apiserver.admissionplugins.enabled.0", "AlwaysPullImages"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_apiserver.admissionplugins.enabled.1", "NodeRestriction"),
 
 					// Conflicts with the old schema
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization.#", "0"),
@@ -254,8 +253,8 @@ func TestAccCloudProjectKubeCustomizationApiServerAdmissionPlugins(t *testing.T)
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", kubeClusterNameKey, name),
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "region", region),
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "service_name", serviceName),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_apiserver.0.admissionplugins.0.enabled.0", "NodeRestriction"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_apiserver.0.admissionplugins.0.disabled.0", "AlwaysPullImages"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_apiserver.admissionplugins.enabled.0", "NodeRestriction"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_apiserver.admissionplugins.disabled.0", "AlwaysPullImages"),
 
 					// Conflicts with the old schema
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization.#", "0"),
@@ -286,7 +285,7 @@ func TestAccCloudProjectKubeDeprecatedCustomizationApiServerAdmissionPlugins(t *
 			testAccCheckCloudProjectExists(t)
 			testAccPreCheckKubernetes(t)
 		},
-		Providers: testAccProviders,
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: createConfig,
@@ -296,8 +295,8 @@ func TestAccCloudProjectKubeDeprecatedCustomizationApiServerAdmissionPlugins(t *
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "service_name", serviceName),
 
 					// Deprecated configuration
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization.0.apiserver.0.admissionplugins.0.enabled.0", "NodeRestriction"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization.0.apiserver.0.admissionplugins.0.disabled.0", "AlwaysPullImages"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization.apiserver.admissionplugins.enabled.0", "NodeRestriction"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization.apiserver.admissionplugins.disabled.0", "AlwaysPullImages"),
 
 					// Conflicts with the new schema
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_apiserver.#", "0"),
@@ -388,7 +387,7 @@ resource "ovh_cloud_project_kube" "cluster" {
 			testAccCheckCloudProjectExists(t)
 			testAccPreCheckKubernetes(t)
 		},
-		Providers: testAccProviders,
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				// no kube proxy mode specified, should contain default values from API
@@ -408,9 +407,8 @@ resource "ovh_cloud_project_kube" "cluster" {
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "region", region),
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "service_name", serviceName),
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "kube_proxy_mode", "iptables"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.iptables.0.min_sync_period", "PT0S"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.iptables.0.sync_period", ""),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.#", "0"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.iptables.min_sync_period", "PT0S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.iptables.sync_period", ""),
 				),
 			},
 			{
@@ -420,9 +418,8 @@ resource "ovh_cloud_project_kube" "cluster" {
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "region", region),
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "service_name", serviceName),
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "kube_proxy_mode", "iptables"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.iptables.0.min_sync_period", "PT0S"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.iptables.0.sync_period", ""),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.#", "0"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.iptables.min_sync_period", "PT0S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.iptables.sync_period", ""),
 				),
 			},
 			{
@@ -432,9 +429,8 @@ resource "ovh_cloud_project_kube" "cluster" {
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "region", region),
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "service_name", serviceName),
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "kube_proxy_mode", "iptables"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.iptables.0.min_sync_period", "PT30S"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.iptables.0.sync_period", "PT30S"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.#", "0"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.iptables.min_sync_period", "PT30S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.iptables.sync_period", "PT30S"),
 				),
 			},
 		},
@@ -527,7 +523,7 @@ resource "ovh_cloud_project_kube" "cluster" {
 			testAccCheckCloudProjectExists(t)
 			testAccPreCheckKubernetes(t)
 		},
-		Providers: testAccProviders,
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				// no kube proxy mode specified, should contain default values from API
@@ -547,13 +543,12 @@ resource "ovh_cloud_project_kube" "cluster" {
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "region", region),
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "service_name", serviceName),
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "kube_proxy_mode", "ipvs"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.min_sync_period", "PT0S"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.sync_period", ""),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.scheduler", ""),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.tcp_fin_timeout", ""),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.tcp_timeout", ""),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.udp_timeout", ""),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.iptables.#", "0"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.min_sync_period", "PT0S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.sync_period", ""),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.scheduler", ""),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.tcp_fin_timeout", ""),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.tcp_timeout", ""),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.udp_timeout", ""),
 				),
 			},
 			{
@@ -563,13 +558,12 @@ resource "ovh_cloud_project_kube" "cluster" {
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "region", region),
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "service_name", serviceName),
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "kube_proxy_mode", "ipvs"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.min_sync_period", "PT0S"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.sync_period", ""),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.scheduler", ""),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.tcp_fin_timeout", ""),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.tcp_timeout", ""),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.udp_timeout", ""),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.iptables.#", "0"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.min_sync_period", "PT0S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.sync_period", ""),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.scheduler", ""),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.tcp_fin_timeout", ""),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.tcp_timeout", ""),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.udp_timeout", ""),
 				),
 			},
 			{
@@ -579,13 +573,12 @@ resource "ovh_cloud_project_kube" "cluster" {
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "region", region),
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "service_name", serviceName),
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "kube_proxy_mode", "ipvs"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.min_sync_period", "PT30S"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.sync_period", "PT30S"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.scheduler", "rr"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.tcp_fin_timeout", "PT30S"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.tcp_timeout", "PT30S"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.udp_timeout", "PT30S"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.iptables.#", "0"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.min_sync_period", "PT30S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.sync_period", "PT30S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.scheduler", "rr"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.tcp_fin_timeout", "PT30S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.tcp_timeout", "PT30S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.udp_timeout", "PT30S"),
 				),
 			},
 		},
@@ -735,19 +728,19 @@ resource "ovh_cloud_project_kube" "cluster" {
 			testAccCheckCloudProjectExists(t)
 			testAccPreCheckKubernetes(t)
 		},
-		Providers: testAccProviders,
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config:      erroredConfigKubeProxyMode,
-				ExpectError: regexp.MustCompile(`is not among valid values`),
+				ExpectError: regexp.MustCompile(`value must be one of`),
 			},
 			{
 				Config:      erroredConfigInvalidRFC3339Duration,
-				ExpectError: regexp.MustCompile(`does not match RFC3339 duration`),
+				ExpectError: regexp.MustCompile(strings.ReplaceAll(`value must respect RFC3339 duration format`, " ", `\s+`)),
 			},
 			{
 				Config:      erroredConfigInvalidScheduler,
-				ExpectError: regexp.MustCompile(`is not among valid values`),
+				ExpectError: regexp.MustCompile(strings.ReplaceAll(`value must be one of`, " ", `\s+`)),
 			},
 			{
 				Config: config,
@@ -758,22 +751,22 @@ resource "ovh_cloud_project_kube" "cluster" {
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "kube_proxy_mode", "iptables"),
 
 					// customization_kube_proxy - ipvs
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.min_sync_period", "PT0S"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.scheduler", "rr"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.sync_period", "PT0S"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.tcp_fin_timeout", "PT0S"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.tcp_timeout", "PT0S"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.udp_timeout", "PT0S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.min_sync_period", "PT0S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.scheduler", "rr"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.sync_period", "PT0S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.tcp_fin_timeout", "PT0S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.tcp_timeout", "PT0S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.udp_timeout", "PT0S"),
 
 					// customization_kube_proxy - iptables
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.iptables.0.min_sync_period", "PT0S"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.iptables.0.sync_period", "PT0S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.iptables.min_sync_period", "PT0S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.iptables.sync_period", "PT0S"),
 
 					// customization - apiserver
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization.0.apiserver.0.admissionplugins.0.enabled.#", "1"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization.0.apiserver.0.admissionplugins.0.enabled.0", "NodeRestriction"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization.0.apiserver.0.admissionplugins.0.disabled.#", "1"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization.0.apiserver.0.admissionplugins.0.disabled.0", "AlwaysPullImages"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization.apiserver.admissionplugins.enabled.#", "1"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization.apiserver.admissionplugins.enabled.0", "NodeRestriction"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization.apiserver.admissionplugins.disabled.#", "1"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization.apiserver.admissionplugins.disabled.0", "AlwaysPullImages"),
 				),
 			},
 			{
@@ -785,22 +778,22 @@ resource "ovh_cloud_project_kube" "cluster" {
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "kube_proxy_mode", "iptables"),
 
 					// customization_kube_proxy - ipvs
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.min_sync_period", "PT30S"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.scheduler", "rr"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.sync_period", "PT30S"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.tcp_fin_timeout", "PT30S"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.tcp_timeout", "PT30S"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.udp_timeout", "PT30S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.min_sync_period", "PT30S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.scheduler", "rr"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.sync_period", "PT30S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.tcp_fin_timeout", "PT30S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.tcp_timeout", "PT30S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.udp_timeout", "PT30S"),
 
 					// customization_kube_proxy - iptables
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.iptables.0.min_sync_period", "PT30S"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.iptables.0.sync_period", "PT30S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.iptables.min_sync_period", "PT30S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.iptables.sync_period", "PT30S"),
 
 					// customization - apiserver
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization.0.apiserver.0.admissionplugins.0.disabled.#", "0"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization.0.apiserver.0.admissionplugins.0.enabled.#", "2"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization.0.apiserver.0.admissionplugins.0.enabled.0", "AlwaysPullImages"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization.0.apiserver.0.admissionplugins.0.enabled.1", "NodeRestriction"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization.apiserver.admissionplugins.disabled.#", "0"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization.apiserver.admissionplugins.enabled.#", "2"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization.apiserver.admissionplugins.enabled.0", "AlwaysPullImages"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization.apiserver.admissionplugins.enabled.1", "NodeRestriction"),
 				),
 			},
 		},
@@ -888,7 +881,7 @@ resource "ovh_cloud_project_kube" "cluster" {
 			testAccCheckCloudProjectExists(t)
 			testAccPreCheckKubernetes(t)
 		},
-		Providers: testAccProviders,
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: config,
@@ -899,22 +892,22 @@ resource "ovh_cloud_project_kube" "cluster" {
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "kube_proxy_mode", "iptables"),
 
 					// customization_kube_proxy - ipvs
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.min_sync_period", "PT0S"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.scheduler", "rr"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.sync_period", "PT0S"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.tcp_fin_timeout", "PT0S"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.tcp_timeout", "PT0S"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.udp_timeout", "PT0S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.min_sync_period", "PT0S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.scheduler", "rr"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.sync_period", "PT0S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.tcp_fin_timeout", "PT0S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.tcp_timeout", "PT0S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.udp_timeout", "PT0S"),
 
 					// customization_kube_proxy - iptables
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.iptables.0.min_sync_period", "PT0S"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.iptables.0.sync_period", "PT0S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.iptables.min_sync_period", "PT0S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.iptables.sync_period", "PT0S"),
 
 					// customization - apiserver
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_apiserver.0.admissionplugins.0.enabled.#", "1"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_apiserver.0.admissionplugins.0.enabled.0", "NodeRestriction"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_apiserver.0.admissionplugins.0.disabled.#", "1"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_apiserver.0.admissionplugins.0.disabled.0", "AlwaysPullImages"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_apiserver.admissionplugins.enabled.#", "1"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_apiserver.admissionplugins.enabled.0", "NodeRestriction"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_apiserver.admissionplugins.disabled.#", "1"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_apiserver.admissionplugins.disabled.0", "AlwaysPullImages"),
 				),
 			},
 			{
@@ -926,22 +919,22 @@ resource "ovh_cloud_project_kube" "cluster" {
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "kube_proxy_mode", "iptables"),
 
 					// customization_kube_proxy - ipvs
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.min_sync_period", "PT30S"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.scheduler", "rr"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.sync_period", "PT30S"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.tcp_fin_timeout", "PT30S"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.tcp_timeout", "PT30S"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.udp_timeout", "PT30S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.min_sync_period", "PT30S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.scheduler", "rr"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.sync_period", "PT30S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.tcp_fin_timeout", "PT30S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.tcp_timeout", "PT30S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.udp_timeout", "PT30S"),
 
 					// customization_kube_proxy - iptables
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.iptables.0.min_sync_period", "PT30S"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.iptables.0.sync_period", "PT30S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.iptables.min_sync_period", "PT30S"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_kube_proxy.iptables.sync_period", "PT30S"),
 
 					// customization - apiserver
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_apiserver.0.admissionplugins.0.disabled.#", "0"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_apiserver.0.admissionplugins.0.enabled.#", "2"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_apiserver.0.admissionplugins.0.enabled.0", "AlwaysPullImages"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_apiserver.0.admissionplugins.0.enabled.1", "NodeRestriction"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_apiserver.admissionplugins.disabled.#", "0"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_apiserver.admissionplugins.enabled.#", "2"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_apiserver.admissionplugins.enabled.0", "AlwaysPullImages"),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "customization_apiserver.admissionplugins.enabled.1", "NodeRestriction"),
 				),
 			},
 		},
@@ -994,7 +987,7 @@ func TestAccCloudProjectKubeVRack(t *testing.T) {
 			testAccPreCheckKubernetes(t)
 			testAccPreCheckKubernetesVRack(t)
 		},
-		Providers: testAccProviders,
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: config.String(),
@@ -1003,8 +996,8 @@ func TestAccCloudProjectKubeVRack(t *testing.T) {
 					resource.TestCheckResourceAttrSet("ovh_cloud_project_kube.cluster", "kubeconfig"),
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", kubeClusterNameKey, name),
 					resource.TestCheckResourceAttrSet("ovh_cloud_project_kube.cluster", "version"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "private_network_configuration.0.default_vrack_gateway", configData1.DefaultVrackGateway),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "private_network_configuration.0.private_network_routing_as_default", strconv.FormatBool(configData1.PrivateNetworkRoutingAsDefault)),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "private_network_configuration.default_vrack_gateway", configData1.DefaultVrackGateway),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "private_network_configuration.private_network_routing_as_default", strconv.FormatBool(configData1.PrivateNetworkRoutingAsDefault)),
 					resource.TestCheckResourceAttrPair("ovh_cloud_project_kube.cluster", "load_balancers_subnet_id", "ovh_cloud_project_network_private_subnet.networksubnet", "id"),
 				),
 			},
@@ -1014,8 +1007,8 @@ func TestAccCloudProjectKubeVRack(t *testing.T) {
 					resource.TestCheckResourceAttrSet("ovh_cloud_project_kube.cluster", "kubeconfig"),
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", kubeClusterNameKey, name),
 					resource.TestCheckResourceAttrSet("ovh_cloud_project_kube.cluster", "version"),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "private_network_configuration.0.default_vrack_gateway", configData2.DefaultVrackGateway),
-					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "private_network_configuration.0.private_network_routing_as_default", strconv.FormatBool(configData2.PrivateNetworkRoutingAsDefault)),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "private_network_configuration.default_vrack_gateway", configData2.DefaultVrackGateway),
+					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "private_network_configuration.private_network_routing_as_default", strconv.FormatBool(configData2.PrivateNetworkRoutingAsDefault)),
 					resource.TestCheckResourceAttrPair("ovh_cloud_project_kube.cluster", "load_balancers_subnet_id", "ovh_cloud_project_network_private_subnet.networksubnet2", "id"),
 				),
 			},
@@ -1042,7 +1035,7 @@ func TestAccCloudProjectKube_basic(t *testing.T) {
 			testAccCheckCloudProjectExists(t)
 			testAccPreCheckKubernetes(t)
 		},
-		Providers: testAccProviders,
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: config,
@@ -1053,10 +1046,10 @@ func TestAccCloudProjectKube_basic(t *testing.T) {
 					resource.TestCheckResourceAttr("ovh_cloud_project_kube.cluster", "version", version),
 					resource.TestCheckResourceAttrSet("ovh_cloud_project_kube.cluster", kubeClusterPlanKey),
 					resource.TestCheckResourceAttrSet("ovh_cloud_project_kube.cluster", "kubeconfig"),
-					resource.TestCheckResourceAttrSet("ovh_cloud_project_kube.cluster", "kubeconfig_attributes.0.host"),
-					resource.TestCheckResourceAttrSet("ovh_cloud_project_kube.cluster", "kubeconfig_attributes.0.cluster_ca_certificate"),
-					resource.TestCheckResourceAttrSet("ovh_cloud_project_kube.cluster", "kubeconfig_attributes.0.client_certificate"),
-					resource.TestCheckResourceAttrSet("ovh_cloud_project_kube.cluster", "kubeconfig_attributes.0.client_key"),
+					resource.TestCheckResourceAttrSet("ovh_cloud_project_kube.cluster", "kubeconfig_attributes.host"),
+					resource.TestCheckResourceAttrSet("ovh_cloud_project_kube.cluster", "kubeconfig_attributes.cluster_ca_certificate"),
+					resource.TestCheckResourceAttrSet("ovh_cloud_project_kube.cluster", "kubeconfig_attributes.client_certificate"),
+					resource.TestCheckResourceAttrSet("ovh_cloud_project_kube.cluster", "kubeconfig_attributes.client_key"),
 				),
 			},
 			{
@@ -1102,7 +1095,7 @@ func TestAccCloudProjectKubeEmptyVersion_basic(t *testing.T) {
 			testAccCheckCloudProjectExists(t)
 			testAccPreCheckKubernetes(t)
 		},
-		Providers: testAccProviders,
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: config,
@@ -1155,7 +1148,7 @@ func TestAccCloudProjectKubeUpdatePolicy_basic(t *testing.T) {
 			testAccCheckCloudProjectExists(t)
 			testAccPreCheckKubernetes(t)
 		},
-		Providers: testAccProviders,
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: config,
@@ -1210,7 +1203,7 @@ func TestAccCloudProjectKubeUpdateVersion_basic(t *testing.T) {
 			testAccCheckCloudProjectExists(t)
 			testAccPreCheckKubernetes(t)
 		},
-		Providers: testAccProviders,
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: config,
@@ -1234,88 +1227,9 @@ func TestAccCloudProjectKubeUpdateVersion_basic(t *testing.T) {
 	})
 }
 
-func TestCustomIPVSIPTablesSchemaSetFunc(t *testing.T) {
-	tests := []struct {
-		name        string
-		input       map[string]interface{}
-		expectedHex string
-	}{
-		{
-			name: "Input with P0D value",
-			input: map[string]interface{}{
-				"key1": "P0D",
-				"key2": "value2",
-			},
-			expectedHex: fmt.Sprintf("%#v", map[string]interface{}{
-				"key1": "PT0S",
-				"key2": "value2",
-			}),
-		},
-		{
-			name: "Input without P0D value",
-			input: map[string]interface{}{
-				"key1": "value1",
-				"key2": "value2",
-			},
-			expectedHex: fmt.Sprintf("%#v", map[string]interface{}{
-				"key1": "value1",
-				"key2": "value2",
-			}),
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			expectedHash := schema.HashString(tt.expectedHex)
-			if got := CustomIPVSIPTablesSchemaSetFunc()(tt.input); got != expectedHash {
-				t.Errorf("CustomIPVSIPTablesSchemaSetFunc() = %v, want %v", got, expectedHash)
-			}
-		})
-	}
-}
-
-func TestCustomApiServerAdmissionPluginsSchemaSetFunc(t *testing.T) {
-	tests := []struct {
-		name        string
-		input       map[string]interface{}
-		expectedHex string
-	}{
-		{
-			name: "No plugins",
-			input: map[string]interface{}{
-				"enabled":  []interface{}{},
-				"disabled": []interface{}{},
-			},
-			expectedHex: fmt.Sprintf("%#v", map[string]interface{}{
-				"enabled":  []interface{}{},
-				"disabled": []interface{}{},
-			}),
-		},
-		{
-			name: "Should reorder plugins",
-			input: map[string]interface{}{
-				"enabled":  []interface{}{"foo", "bar"},
-				"disabled": []interface{}{"bar", "foo"},
-			},
-			expectedHex: fmt.Sprintf("%#v", map[string]interface{}{
-				"enabled":  []interface{}{"bar", "foo"},
-				"disabled": []interface{}{"bar", "foo"},
-			}),
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			expectedHash := schema.HashString(tt.expectedHex)
-			if got := CustomApiServerAdmissionPluginsSchemaSetFunc()(tt.input); got != expectedHash {
-				t.Errorf("CustomApiServerAdmissionPluginsSchemaSetFunc() = %v, want %v", got, expectedHash)
-			}
-		})
-	}
-}
-
 func TestRequiredWithSchemaValidation(t *testing.T) {
 	resource.Test(t, resource.TestCase{
-		Providers: testAccProviders,
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: `
