@@ -44,16 +44,23 @@ func dataSourceModelFromResponse(ctx context.Context, res *CloudProjectKubeRespo
 	data.Name = ovhtypes.NewTfStringValue(res.Name)
 	data.ControlPlaneIsUpToDate = ovhtypes.NewTfBoolValue(res.ControlPlaneIsUpToDate)
 	data.IsUpToDate = ovhtypes.NewTfBoolValue(res.IsUpToDate)
-	data.LoadBalancersSubnetId = ovhtypes.NewTfStringValue(res.LoadBalancersSubnetId)
 	data.NodesSubnetId = ovhtypes.NewTfStringValue(res.NodesSubnetId)
 	data.NodesUrl = ovhtypes.NewTfStringValue(res.NodesUrl)
-	data.PrivateNetworkId = ovhtypes.NewTfStringValue(res.PrivateNetworkId)
 	data.Region = ovhtypes.NewTfStringValue(res.Region)
 	data.Status = ovhtypes.NewTfStringValue(res.Status)
 	data.UpdatePolicy = ovhtypes.NewTfStringValue(res.UpdatePolicy)
 	data.Url = ovhtypes.NewTfStringValue(res.Url)
 	data.Plan = ovhtypes.NewTfStringValue(res.Plan)
 	data.KubeProxyMode = ovhtypes.NewTfStringValue(res.KubeProxyMode)
+
+	// For Optional-only fields where the API returns "" when unset,
+	// preserve the prior state value (null) to avoid inconsistent plan errors.
+	if res.PrivateNetworkId != "" {
+		data.PrivateNetworkId = ovhtypes.NewTfStringValue(res.PrivateNetworkId)
+	}
+	if res.LoadBalancersSubnetId != "" {
+		data.LoadBalancersSubnetId = ovhtypes.NewTfStringValue(res.LoadBalancersSubnetId)
+	}
 
 	// Version: strip patch version
 	versionStr := res.Version
