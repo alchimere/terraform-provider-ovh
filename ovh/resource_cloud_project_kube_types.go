@@ -38,7 +38,7 @@ type cloudProjectKubeResourceModel struct {
 	Status                 ovhtypes.TfStringValue                             `tfsdk:"status"`
 	Url                    ovhtypes.TfStringValue                             `tfsdk:"url"`
 	Kubeconfig             ovhtypes.TfStringValue                             `tfsdk:"kubeconfig"`
-	KubeconfigAttributes   *kubeKubeconfigAttributesModel                     `tfsdk:"kubeconfig_attributes"`
+	KubeconfigAttributes   []kubeKubeconfigAttributesModel                    `tfsdk:"kubeconfig_attributes"`
 }
 
 // --- Nested Models ---
@@ -348,12 +348,12 @@ func setKubeconfigOnModel(config *Config, serviceName, kubeId string, data *clou
 	}
 
 	data.Kubeconfig = ovhtypes.NewTfStringValue(*kubeConfig.Raw)
-	data.KubeconfigAttributes = &kubeKubeconfigAttributesModel{
+	data.KubeconfigAttributes = []kubeKubeconfigAttributesModel{{
 		Host:                 ovhtypes.NewTfStringValue(kubeConfig.Clusters[0].Cluster.Server),
 		ClusterCACertificate: ovhtypes.NewTfStringValue(kubeConfig.Clusters[0].Cluster.CertificateAuthorityData),
 		ClientCertificate:    ovhtypes.NewTfStringValue(kubeConfig.Users[0].User.ClientCertificateData),
 		ClientKey:            ovhtypes.NewTfStringValue(kubeConfig.Users[0].User.ClientKeyData),
-	}
+	}}
 
 	return nil
 }

@@ -42,10 +42,10 @@ func TestAccCloudProjectKubeDataSource_basic(t *testing.T) {
 					resource.TestCheckResourceAttrSet("data.ovh_cloud_project_kube.cluster", "kubeconfig"),
 
 					// Check kubeconfig_attributes are present
-					resource.TestCheckResourceAttrSet("data.ovh_cloud_project_kube.cluster", "kubeconfig_attributes.host"),
-					resource.TestCheckResourceAttrSet("data.ovh_cloud_project_kube.cluster", "kubeconfig_attributes.cluster_ca_certificate"),
-					resource.TestCheckResourceAttrSet("data.ovh_cloud_project_kube.cluster", "kubeconfig_attributes.client_certificate"),
-					resource.TestCheckResourceAttrSet("data.ovh_cloud_project_kube.cluster", "kubeconfig_attributes.client_key"),
+					resource.TestCheckResourceAttrSet("data.ovh_cloud_project_kube.cluster", "kubeconfig_attributes.0.host"),
+					resource.TestCheckResourceAttrSet("data.ovh_cloud_project_kube.cluster", "kubeconfig_attributes.0.cluster_ca_certificate"),
+					resource.TestCheckResourceAttrSet("data.ovh_cloud_project_kube.cluster", "kubeconfig_attributes.0.client_certificate"),
+					resource.TestCheckResourceAttrSet("data.ovh_cloud_project_kube.cluster", "kubeconfig_attributes.0.client_key"),
 				),
 			},
 		},
@@ -91,10 +91,10 @@ func TestAccCloudProjectKubeDataSource_kubeProxy(t *testing.T) {
 					resource.TestCheckResourceAttrSet("data.ovh_cloud_project_kube.cluster", "kubeconfig"),
 
 					// Check kubeconfig_attributes are present
-					resource.TestCheckResourceAttrSet("data.ovh_cloud_project_kube.cluster", "kubeconfig_attributes.host"),
-					resource.TestCheckResourceAttrSet("data.ovh_cloud_project_kube.cluster", "kubeconfig_attributes.cluster_ca_certificate"),
-					resource.TestCheckResourceAttrSet("data.ovh_cloud_project_kube.cluster", "kubeconfig_attributes.client_certificate"),
-					resource.TestCheckResourceAttrSet("data.ovh_cloud_project_kube.cluster", "kubeconfig_attributes.client_key"),
+					resource.TestCheckResourceAttrSet("data.ovh_cloud_project_kube.cluster", "kubeconfig_attributes.0.host"),
+					resource.TestCheckResourceAttrSet("data.ovh_cloud_project_kube.cluster", "kubeconfig_attributes.0.cluster_ca_certificate"),
+					resource.TestCheckResourceAttrSet("data.ovh_cloud_project_kube.cluster", "kubeconfig_attributes.0.client_certificate"),
+					resource.TestCheckResourceAttrSet("data.ovh_cloud_project_kube.cluster", "kubeconfig_attributes.0.client_key"),
 				),
 			},
 		},
