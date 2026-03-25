@@ -6,12 +6,24 @@ import (
 	"strings"
 
 	"github.com/hashicorp/go-version"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	ovhtypes "github.com/ovh/terraform-provider-ovh/v2/ovh/types"
 )
 
 // --- Resource Model ---
+
+// kubeconfigAttributesObjectType defines the Terraform object type for kubeconfig_attributes elements.
+var kubeconfigAttributesObjectType = types.ObjectType{
+	AttrTypes: map[string]attr.Type{
+		"host":                   ovhtypes.TfStringType{},
+		"cluster_ca_certificate": ovhtypes.TfStringType{},
+		"client_certificate":     ovhtypes.TfStringType{},
+		"client_key":             ovhtypes.TfStringType{},
+	},
+}
 
 type cloudProjectKubeResourceModel struct {
 	ID                          ovhtypes.TfStringValue                `tfsdk:"id"`
@@ -38,7 +50,7 @@ type cloudProjectKubeResourceModel struct {
 	Status                 ovhtypes.TfStringValue                             `tfsdk:"status"`
 	Url                    ovhtypes.TfStringValue                             `tfsdk:"url"`
 	Kubeconfig             ovhtypes.TfStringValue                             `tfsdk:"kubeconfig"`
-	KubeconfigAttributes   []kubeKubeconfigAttributesModel                    `tfsdk:"kubeconfig_attributes"`
+	KubeconfigAttributes   types.List                                         `tfsdk:"kubeconfig_attributes"`
 }
 
 // --- Nested Models ---
@@ -348,12 +360,18 @@ func setKubeconfigOnModel(config *Config, serviceName, kubeId string, data *clou
 	}
 
 	data.Kubeconfig = ovhtypes.NewTfStringValue(*kubeConfig.Raw)
-	data.KubeconfigAttributes = []kubeKubeconfigAttributesModel{{
+
+	elems := []kubeKubeconfigAttributesModel{{
 		Host:                 ovhtypes.NewTfStringValue(kubeConfig.Clusters[0].Cluster.Server),
 		ClusterCACertificate: ovhtypes.NewTfStringValue(kubeConfig.Clusters[0].Cluster.CertificateAuthorityData),
 		ClientCertificate:    ovhtypes.NewTfStringValue(kubeConfig.Users[0].User.ClientCertificateData),
 		ClientKey:            ovhtypes.NewTfStringValue(kubeConfig.Users[0].User.ClientKeyData),
 	}}
+	listVal, diags := types.ListValueFrom(context.Background(), kubeconfigAttributesObjectType, elems)
+	if diags.HasError() {
+		return fmt.Errorf("failed to build kubeconfig_attributes list: %s", diags)
+	}
+	data.KubeconfigAttributes = listVal
 
 	return nil
 }

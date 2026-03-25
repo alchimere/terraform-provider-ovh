@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-version"
-	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -184,6 +184,36 @@ func (r *cloudProjectKubeResource) Schema(ctx context.Context, _ resource.Schema
 				Computed:   true,
 				Sensitive:  true,
 			},
+			"kubeconfig_attributes": schema.ListNestedAttribute{
+				Computed:    true,
+				Description: "The kubeconfig configuration file of the Kubernetes cluster",
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"host": schema.StringAttribute{
+							CustomType: ovhtypes.TfStringType{},
+							Computed:   true,
+						},
+						"cluster_ca_certificate": schema.StringAttribute{
+							CustomType: ovhtypes.TfStringType{},
+							Computed:   true,
+							Sensitive:  true,
+						},
+						"client_certificate": schema.StringAttribute{
+							CustomType: ovhtypes.TfStringType{},
+							Computed:   true,
+							Sensitive:  true,
+						},
+						"client_key": schema.StringAttribute{
+							CustomType: ovhtypes.TfStringType{},
+							Computed:   true,
+							Sensitive:  true,
+						},
+					},
+				},
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
+				},
+			},
 		},
 		Blocks: map[string]schema.Block{
 			"customization_apiserver": schema.SingleNestedBlock{
@@ -333,35 +363,6 @@ func (r *cloudProjectKubeResource) Schema(ctx context.Context, _ resource.Schema
 					},
 				},
 			},
-			"kubeconfig_attributes": schema.ListNestedBlock{
-				Description: "The kubeconfig configuration file of the Kubernetes cluster",
-				Validators: []validator.List{
-					listvalidator.SizeAtMost(1),
-				},
-				NestedObject: schema.NestedBlockObject{
-					Attributes: map[string]schema.Attribute{
-						"host": schema.StringAttribute{
-							CustomType: ovhtypes.TfStringType{},
-							Computed:   true,
-						},
-						"cluster_ca_certificate": schema.StringAttribute{
-							CustomType: ovhtypes.TfStringType{},
-							Computed:   true,
-							Sensitive:  true,
-						},
-						"client_certificate": schema.StringAttribute{
-							CustomType: ovhtypes.TfStringType{},
-							Computed:   true,
-							Sensitive:  true,
-						},
-						"client_key": schema.StringAttribute{
-							CustomType: ovhtypes.TfStringType{},
-							Computed:   true,
-							Sensitive:  true,
-						},
-					},
-				},
-			},
 		},
 	}
 }
@@ -456,7 +457,7 @@ func (r *cloudProjectKubeResource) Read(ctx context.Context, req resource.ReadRe
 	}
 
 	// Fetch kubeconfig if not yet set
-	if data.Kubeconfig.IsNull() || data.Kubeconfig.ValueString() == "" || len(data.KubeconfigAttributes) == 0 {
+	if data.Kubeconfig.IsNull() || data.Kubeconfig.ValueString() == "" || data.KubeconfigAttributes.IsNull() || data.KubeconfigAttributes.IsUnknown() || len(data.KubeconfigAttributes.Elements()) == 0 {
 		if err := setKubeconfigOnModel(r.config, serviceName, kubeId, &data); err != nil {
 			resp.Diagnostics.AddError(
 				"Failed to fetch kubeconfig",

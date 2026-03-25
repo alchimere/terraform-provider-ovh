@@ -11,7 +11,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 
-	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	ovhtypes "github.com/ovh/terraform-provider-ovh/v2/ovh/types"
 )
@@ -139,6 +138,33 @@ func (d *cloudProjectKubeDataSource) Schema(ctx context.Context, _ datasource.Sc
 				Computed:   true,
 				Sensitive:  true,
 			},
+			"kubeconfig_attributes": schema.ListNestedAttribute{
+				Computed:    true,
+				Description: "The kubeconfig configuration file of the Kubernetes cluster",
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"host": schema.StringAttribute{
+							CustomType: ovhtypes.TfStringType{},
+							Computed:   true,
+						},
+						"cluster_ca_certificate": schema.StringAttribute{
+							CustomType: ovhtypes.TfStringType{},
+							Computed:   true,
+							Sensitive:  true,
+						},
+						"client_certificate": schema.StringAttribute{
+							CustomType: ovhtypes.TfStringType{},
+							Computed:   true,
+							Sensitive:  true,
+						},
+						"client_key": schema.StringAttribute{
+							CustomType: ovhtypes.TfStringType{},
+							Computed:   true,
+							Sensitive:  true,
+						},
+					},
+				},
+			},
 		},
 		Blocks: map[string]schema.Block{
 			"customization_apiserver": schema.SingleNestedBlock{
@@ -226,35 +252,6 @@ func (d *cloudProjectKubeDataSource) Schema(ctx context.Context, _ datasource.Sc
 								CustomType: ovhtypes.TfRFC3339DurationType{},
 								Computed:   true,
 							},
-						},
-					},
-				},
-			},
-			"kubeconfig_attributes": schema.ListNestedBlock{
-				Description: "The kubeconfig configuration file of the Kubernetes cluster",
-				Validators: []validator.List{
-					listvalidator.SizeAtMost(1),
-				},
-				NestedObject: schema.NestedBlockObject{
-					Attributes: map[string]schema.Attribute{
-						"host": schema.StringAttribute{
-							CustomType: ovhtypes.TfStringType{},
-							Computed:   true,
-						},
-						"cluster_ca_certificate": schema.StringAttribute{
-							CustomType: ovhtypes.TfStringType{},
-							Computed:   true,
-							Sensitive:  true,
-						},
-						"client_certificate": schema.StringAttribute{
-							CustomType: ovhtypes.TfStringType{},
-							Computed:   true,
-							Sensitive:  true,
-						},
-						"client_key": schema.StringAttribute{
-							CustomType: ovhtypes.TfStringType{},
-							Computed:   true,
-							Sensitive:  true,
 						},
 					},
 				},
