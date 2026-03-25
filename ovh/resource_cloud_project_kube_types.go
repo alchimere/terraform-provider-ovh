@@ -62,17 +62,17 @@ type kubeCustomizationDeprecatedModel struct {
 }
 
 type kubeProxyIPTablesModel struct {
-	MinSyncPeriod ovhtypes.TfStringValue `tfsdk:"min_sync_period"`
-	SyncPeriod    ovhtypes.TfStringValue `tfsdk:"sync_period"`
+	MinSyncPeriod ovhtypes.TfRFC3339DurationValue `tfsdk:"min_sync_period"`
+	SyncPeriod    ovhtypes.TfRFC3339DurationValue `tfsdk:"sync_period"`
 }
 
 type kubeProxyIPVSModel struct {
-	MinSyncPeriod ovhtypes.TfStringValue `tfsdk:"min_sync_period"`
-	Scheduler     ovhtypes.TfStringValue `tfsdk:"scheduler"`
-	SyncPeriod    ovhtypes.TfStringValue `tfsdk:"sync_period"`
-	TCPFinTimeout ovhtypes.TfStringValue `tfsdk:"tcp_fin_timeout"`
-	TCPTimeout    ovhtypes.TfStringValue `tfsdk:"tcp_timeout"`
-	UDPTimeout    ovhtypes.TfStringValue `tfsdk:"udp_timeout"`
+	MinSyncPeriod ovhtypes.TfRFC3339DurationValue `tfsdk:"min_sync_period"`
+	Scheduler     ovhtypes.TfStringValue          `tfsdk:"scheduler"`
+	SyncPeriod    ovhtypes.TfRFC3339DurationValue `tfsdk:"sync_period"`
+	TCPFinTimeout ovhtypes.TfRFC3339DurationValue `tfsdk:"tcp_fin_timeout"`
+	TCPTimeout    ovhtypes.TfRFC3339DurationValue `tfsdk:"tcp_timeout"`
+	UDPTimeout    ovhtypes.TfRFC3339DurationValue `tfsdk:"udp_timeout"`
 }
 
 type kubeCustomizationKubeProxyModel struct {
@@ -319,17 +319,17 @@ func modelFromResponse(ctx context.Context, res *CloudProjectKubeResponse, data 
 	// Kube proxy customization
 	if res.Customization.KubeProxy != nil && data.CustomizationKubeProxy != nil {
 		if res.Customization.KubeProxy.IPTables != nil && data.CustomizationKubeProxy.IPTables != nil {
-			data.CustomizationKubeProxy.IPTables.MinSyncPeriod = optionalStringToTfValue(res.Customization.KubeProxy.IPTables.MinSyncPeriod)
-			data.CustomizationKubeProxy.IPTables.SyncPeriod = optionalStringToTfValue(res.Customization.KubeProxy.IPTables.SyncPeriod)
+			data.CustomizationKubeProxy.IPTables.MinSyncPeriod = optionalDurationToTfValue(res.Customization.KubeProxy.IPTables.MinSyncPeriod)
+			data.CustomizationKubeProxy.IPTables.SyncPeriod = optionalDurationToTfValue(res.Customization.KubeProxy.IPTables.SyncPeriod)
 		}
 
 		if res.Customization.KubeProxy.IPVS != nil && data.CustomizationKubeProxy.IPVS != nil {
-			data.CustomizationKubeProxy.IPVS.MinSyncPeriod = optionalStringToTfValue(res.Customization.KubeProxy.IPVS.MinSyncPeriod)
+			data.CustomizationKubeProxy.IPVS.MinSyncPeriod = optionalDurationToTfValue(res.Customization.KubeProxy.IPVS.MinSyncPeriod)
 			data.CustomizationKubeProxy.IPVS.Scheduler = optionalStringToTfValue(res.Customization.KubeProxy.IPVS.Scheduler)
-			data.CustomizationKubeProxy.IPVS.SyncPeriod = optionalStringToTfValue(res.Customization.KubeProxy.IPVS.SyncPeriod)
-			data.CustomizationKubeProxy.IPVS.TCPFinTimeout = optionalStringToTfValue(res.Customization.KubeProxy.IPVS.TCPFinTimeout)
-			data.CustomizationKubeProxy.IPVS.TCPTimeout = optionalStringToTfValue(res.Customization.KubeProxy.IPVS.TCPTimeout)
-			data.CustomizationKubeProxy.IPVS.UDPTimeout = optionalStringToTfValue(res.Customization.KubeProxy.IPVS.UDPTimeout)
+			data.CustomizationKubeProxy.IPVS.SyncPeriod = optionalDurationToTfValue(res.Customization.KubeProxy.IPVS.SyncPeriod)
+			data.CustomizationKubeProxy.IPVS.TCPFinTimeout = optionalDurationToTfValue(res.Customization.KubeProxy.IPVS.TCPFinTimeout)
+			data.CustomizationKubeProxy.IPVS.TCPTimeout = optionalDurationToTfValue(res.Customization.KubeProxy.IPVS.TCPTimeout)
+			data.CustomizationKubeProxy.IPVS.UDPTimeout = optionalDurationToTfValue(res.Customization.KubeProxy.IPVS.UDPTimeout)
 		}
 	}
 
@@ -366,6 +366,14 @@ func optionalStringToTfValue(s *string) ovhtypes.TfStringValue {
 		return ovhtypes.TfStringValue{StringValue: basetypes.NewStringValue("")}
 	}
 	return ovhtypes.NewTfStringValue(*s)
+}
+
+// optionalDurationToTfValue converts a *string to a TfRFC3339DurationValue.
+func optionalDurationToTfValue(s *string) ovhtypes.TfRFC3339DurationValue {
+	if s == nil {
+		return ovhtypes.TfRFC3339DurationValue{StringValue: basetypes.NewStringValue("")}
+	}
+	return ovhtypes.NewTfRFC3339DurationValue(*s)
 }
 
 // tfStringListFromOptionalSlice converts a *[]string to TfListNestedValue.

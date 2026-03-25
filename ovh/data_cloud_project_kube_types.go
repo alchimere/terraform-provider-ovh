@@ -108,20 +108,20 @@ func dataSourceModelFromResponse(ctx context.Context, res *CloudProjectKubeRespo
 			if data.CustomizationKubeProxy.IPTables == nil {
 				data.CustomizationKubeProxy.IPTables = &kubeProxyIPTablesModel{}
 			}
-			data.CustomizationKubeProxy.IPTables.MinSyncPeriod = optionalStringToTfValue(res.Customization.KubeProxy.IPTables.MinSyncPeriod)
-			data.CustomizationKubeProxy.IPTables.SyncPeriod = optionalStringToTfValue(res.Customization.KubeProxy.IPTables.SyncPeriod)
+			data.CustomizationKubeProxy.IPTables.MinSyncPeriod = optionalDurationToTfValue(res.Customization.KubeProxy.IPTables.MinSyncPeriod)
+			data.CustomizationKubeProxy.IPTables.SyncPeriod = optionalDurationToTfValue(res.Customization.KubeProxy.IPTables.SyncPeriod)
 		}
 
 		if res.Customization.KubeProxy.IPVS != nil {
 			if data.CustomizationKubeProxy.IPVS == nil {
 				data.CustomizationKubeProxy.IPVS = &kubeProxyIPVSModel{}
 			}
-			data.CustomizationKubeProxy.IPVS.MinSyncPeriod = optionalStringToTfValue(res.Customization.KubeProxy.IPVS.MinSyncPeriod)
+			data.CustomizationKubeProxy.IPVS.MinSyncPeriod = optionalDurationToTfValue(res.Customization.KubeProxy.IPVS.MinSyncPeriod)
 			data.CustomizationKubeProxy.IPVS.Scheduler = optionalStringToTfValue(res.Customization.KubeProxy.IPVS.Scheduler)
-			data.CustomizationKubeProxy.IPVS.SyncPeriod = optionalStringToTfValue(res.Customization.KubeProxy.IPVS.SyncPeriod)
-			data.CustomizationKubeProxy.IPVS.TCPFinTimeout = optionalStringToTfValue(res.Customization.KubeProxy.IPVS.TCPFinTimeout)
-			data.CustomizationKubeProxy.IPVS.TCPTimeout = optionalStringToTfValue(res.Customization.KubeProxy.IPVS.TCPTimeout)
-			data.CustomizationKubeProxy.IPVS.UDPTimeout = optionalStringToTfValue(res.Customization.KubeProxy.IPVS.UDPTimeout)
+			data.CustomizationKubeProxy.IPVS.SyncPeriod = optionalDurationToTfValue(res.Customization.KubeProxy.IPVS.SyncPeriod)
+			data.CustomizationKubeProxy.IPVS.TCPFinTimeout = optionalDurationToTfValue(res.Customization.KubeProxy.IPVS.TCPFinTimeout)
+			data.CustomizationKubeProxy.IPVS.TCPTimeout = optionalDurationToTfValue(res.Customization.KubeProxy.IPVS.TCPTimeout)
+			data.CustomizationKubeProxy.IPVS.UDPTimeout = optionalDurationToTfValue(res.Customization.KubeProxy.IPVS.UDPTimeout)
 		}
 
 		// If both iptables and ipvs are nil, remove the block

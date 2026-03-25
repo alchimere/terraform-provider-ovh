@@ -190,11 +190,11 @@ func (d *cloudProjectKubeDataSource) Schema(ctx context.Context, _ datasource.Sc
 					"iptables": schema.SingleNestedBlock{
 						Attributes: map[string]schema.Attribute{
 							"min_sync_period": schema.StringAttribute{
-								CustomType: ovhtypes.TfStringType{},
+								CustomType: ovhtypes.TfRFC3339DurationType{},
 								Computed:   true,
 							},
 							"sync_period": schema.StringAttribute{
-								CustomType: ovhtypes.TfStringType{},
+								CustomType: ovhtypes.TfRFC3339DurationType{},
 								Computed:   true,
 							},
 						},
@@ -202,7 +202,7 @@ func (d *cloudProjectKubeDataSource) Schema(ctx context.Context, _ datasource.Sc
 					"ipvs": schema.SingleNestedBlock{
 						Attributes: map[string]schema.Attribute{
 							"min_sync_period": schema.StringAttribute{
-								CustomType: ovhtypes.TfStringType{},
+								CustomType: ovhtypes.TfRFC3339DurationType{},
 								Computed:   true,
 							},
 							"scheduler": schema.StringAttribute{
@@ -210,19 +210,19 @@ func (d *cloudProjectKubeDataSource) Schema(ctx context.Context, _ datasource.Sc
 								Computed:   true,
 							},
 							"sync_period": schema.StringAttribute{
-								CustomType: ovhtypes.TfStringType{},
+								CustomType: ovhtypes.TfRFC3339DurationType{},
 								Computed:   true,
 							},
 							"tcp_fin_timeout": schema.StringAttribute{
-								CustomType: ovhtypes.TfStringType{},
+								CustomType: ovhtypes.TfRFC3339DurationType{},
 								Computed:   true,
 							},
 							"tcp_timeout": schema.StringAttribute{
-								CustomType: ovhtypes.TfStringType{},
+								CustomType: ovhtypes.TfRFC3339DurationType{},
 								Computed:   true,
 							},
 							"udp_timeout": schema.StringAttribute{
-								CustomType: ovhtypes.TfStringType{},
+								CustomType: ovhtypes.TfRFC3339DurationType{},
 								Computed:   true,
 							},
 						},

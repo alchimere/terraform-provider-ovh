@@ -240,7 +240,7 @@ func (r *cloudProjectKubeResource) Schema(ctx context.Context, _ resource.Schema
 					"iptables": schema.SingleNestedBlock{
 						Attributes: map[string]schema.Attribute{
 							"min_sync_period": schema.StringAttribute{
-								CustomType:  ovhtypes.TfStringType{},
+								CustomType:  ovhtypes.TfRFC3339DurationType{},
 								Optional:    true,
 								Description: "Minimum period that iptables rules are refreshed, in RFC3339 duration format",
 								Validators: []validator.String{
@@ -248,7 +248,7 @@ func (r *cloudProjectKubeResource) Schema(ctx context.Context, _ resource.Schema
 								},
 							},
 							"sync_period": schema.StringAttribute{
-								CustomType:  ovhtypes.TfStringType{},
+								CustomType:  ovhtypes.TfRFC3339DurationType{},
 								Optional:    true,
 								Description: "Period that iptables rules are refreshed, in RFC3339 duration format",
 								Validators: []validator.String{
@@ -260,7 +260,7 @@ func (r *cloudProjectKubeResource) Schema(ctx context.Context, _ resource.Schema
 					"ipvs": schema.SingleNestedBlock{
 						Attributes: map[string]schema.Attribute{
 							"min_sync_period": schema.StringAttribute{
-								CustomType:  ovhtypes.TfStringType{},
+								CustomType:  ovhtypes.TfRFC3339DurationType{},
 								Optional:    true,
 								Description: "Minimum period that IPVS rules are refreshed, in RFC3339 duration format",
 								Validators: []validator.String{
@@ -276,7 +276,7 @@ func (r *cloudProjectKubeResource) Schema(ctx context.Context, _ resource.Schema
 								},
 							},
 							"sync_period": schema.StringAttribute{
-								CustomType:  ovhtypes.TfStringType{},
+								CustomType:  ovhtypes.TfRFC3339DurationType{},
 								Optional:    true,
 								Description: "Period that IPVS rules are refreshed, in RFC3339 duration format",
 								Validators: []validator.String{
@@ -284,7 +284,7 @@ func (r *cloudProjectKubeResource) Schema(ctx context.Context, _ resource.Schema
 								},
 							},
 							"tcp_fin_timeout": schema.StringAttribute{
-								CustomType:  ovhtypes.TfStringType{},
+								CustomType:  ovhtypes.TfRFC3339DurationType{},
 								Optional:    true,
 								Description: "Timeout value used for IPVS TCP sessions after receiving a FIN in RFC3339 duration format",
 								Validators: []validator.String{
@@ -292,7 +292,7 @@ func (r *cloudProjectKubeResource) Schema(ctx context.Context, _ resource.Schema
 								},
 							},
 							"tcp_timeout": schema.StringAttribute{
-								CustomType:  ovhtypes.TfStringType{},
+								CustomType:  ovhtypes.TfRFC3339DurationType{},
 								Optional:    true,
 								Description: "Timeout value used for idle IPVS TCP sessions in RFC3339 duration format",
 								Validators: []validator.String{
@@ -300,7 +300,7 @@ func (r *cloudProjectKubeResource) Schema(ctx context.Context, _ resource.Schema
 								},
 							},
 							"udp_timeout": schema.StringAttribute{
-								CustomType:  ovhtypes.TfStringType{},
+								CustomType:  ovhtypes.TfRFC3339DurationType{},
 								Optional:    true,
 								Description: "Timeout value used for IPVS UDP packets in RFC3339 duration format",
 								Validators: []validator.String{
