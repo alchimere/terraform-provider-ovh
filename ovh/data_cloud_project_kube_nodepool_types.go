@@ -150,7 +150,6 @@ func CloudProjectKubeNodePoolDataSourceSchema(ctx context.Context) schema.Schema
 		},
 		Blocks: map[string]schema.Block{
 			"template": schema.SingleNestedBlock{
-				// NestedObject: schema.NestedBlockObject{
 				Attributes: map[string]schema.Attribute{
 					"metadata": schema.SingleNestedAttribute{
 						Attributes: map[string]schema.Attribute{
@@ -224,7 +223,11 @@ func CloudProjectKubeNodePoolDataSourceSchema(ctx context.Context) schema.Schema
 						Description: "spec",
 					},
 				},
-				// },
+				CustomType: NodePoolTemplateType{
+					ObjectType: types.ObjectType{
+						AttrTypes: NodePoolTemplateValue{}.AttributeTypes(ctx),
+					},
+				},
 				Description: "Node pool template",
 			},
 		},
