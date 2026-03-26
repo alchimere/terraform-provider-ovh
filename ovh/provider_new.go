@@ -235,6 +235,7 @@ func (p *OvhProvider) DataSources(_ context.Context) []func() datasource.DataSou
 		NewCloudProjectGatewayInterfaceDataSource,
 		NewCloudProjectImageDataSource,
 		NewCloudProjectImagesDataSource,
+		NewCloudProjectKubeDataSource,
 		NewCloudProjectKubeIPRestrictionsDataSource,
 		NewCloudProjectKubeNodePoolDataSource,
 		NewCloudProjectKubeNodepoolNodesDataSource,
@@ -302,6 +303,7 @@ func (p *OvhProvider) Resources(_ context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewCloudProjectAlertingResource,
 		NewCloudProjectGatewayInterfaceResource,
+		NewCloudProjectKubeResource,
 		NewCloudProjectKubeIPRestrictionsResource,
 		NewCloudProjectKubeNodePoolResource,
 		NewCloudProjectKubeOIDCResource,

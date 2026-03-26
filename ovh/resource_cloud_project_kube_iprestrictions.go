@@ -250,7 +250,7 @@ func (r *cloudProjectKubeIPRestrictionsResource) updateIPRestrictions(ctx contex
 	}
 
 	log.Printf("[DEBUG] Waiting for kube %s to be READY", kubeId)
-	if err := waitForCloudProjectKubeReady(r.config.OVHClient, serviceName, kubeId, []string{"REDEPLOYING", "RESETTING"}, []string{"READY"}, timeout); err != nil {
+	if err := waitForCloudProjectKubeReadyCtx(ctx, r.config.OVHClient, serviceName, kubeId, timeout); err != nil {
 		return fmt.Errorf("timeout while waiting kube %s to be READY: %w", kubeId, err)
 	}
 	log.Printf("[DEBUG] kube %s is READY", kubeId)

@@ -29,7 +29,7 @@ func TestAccCloudProjectKubeDataSource_basic(t *testing.T) {
 			testAccCheckCloudProjectExists(t)
 			testAccPreCheckKubernetes(t)
 		},
-		Providers: testAccProviders,
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: config,
@@ -68,7 +68,7 @@ func TestAccCloudProjectKubeDataSource_kubeProxy(t *testing.T) {
 			testAccCheckCloudProjectExists(t)
 			testAccPreCheckKubernetes(t)
 		},
-		Providers: testAccProviders,
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: config,
@@ -77,15 +77,15 @@ func TestAccCloudProjectKubeDataSource_kubeProxy(t *testing.T) {
 					resource.TestCheckResourceAttr("data.ovh_cloud_project_kube.cluster", "name", name),
 					resource.TestCheckResourceAttr("data.ovh_cloud_project_kube.cluster", "kube_proxy_mode", "ipvs"),
 
-					resource.TestCheckResourceAttr("data.ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.iptables.0.min_sync_period", "PT30S"),
-					resource.TestCheckResourceAttr("data.ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.iptables.0.sync_period", "PT30S"),
+					resource.TestCheckResourceAttr("data.ovh_cloud_project_kube.cluster", "customization_kube_proxy.iptables.min_sync_period", "PT30S"),
+					resource.TestCheckResourceAttr("data.ovh_cloud_project_kube.cluster", "customization_kube_proxy.iptables.sync_period", "PT30S"),
 
-					resource.TestCheckResourceAttr("data.ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.min_sync_period", "PT30S"),
-					resource.TestCheckResourceAttr("data.ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.sync_period", "PT30S"),
-					resource.TestCheckResourceAttr("data.ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.scheduler", "rr"),
-					resource.TestCheckResourceAttr("data.ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.tcp_fin_timeout", "PT30S"),
-					resource.TestCheckResourceAttr("data.ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.tcp_timeout", "PT30S"),
-					resource.TestCheckResourceAttr("data.ovh_cloud_project_kube.cluster", "customization_kube_proxy.0.ipvs.0.udp_timeout", "PT30S"),
+					resource.TestCheckResourceAttr("data.ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.min_sync_period", "PT30S"),
+					resource.TestCheckResourceAttr("data.ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.sync_period", "PT30S"),
+					resource.TestCheckResourceAttr("data.ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.scheduler", "rr"),
+					resource.TestCheckResourceAttr("data.ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.tcp_fin_timeout", "PT30S"),
+					resource.TestCheckResourceAttr("data.ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.tcp_timeout", "PT30S"),
+					resource.TestCheckResourceAttr("data.ovh_cloud_project_kube.cluster", "customization_kube_proxy.ipvs.udp_timeout", "PT30S"),
 
 					// Check kubeconfig is present and not empty
 					resource.TestCheckResourceAttrSet("data.ovh_cloud_project_kube.cluster", "kubeconfig"),
