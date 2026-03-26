@@ -46,6 +46,25 @@ func resourceCloudProjectKubeNodePool() *schema.Resource {
 				Required:    true,
 				ForceNew:    true,
 			},
+			"attach_floating_ips": {
+				Description: "floating IPs configuration",
+				Optional:    true,
+				Computed:    true,
+				Type:        schema.TypeSet,
+				MaxItems:    1,
+				Set:         CustomSchemaSetFunc(),
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"enabled": {
+							Type:        schema.TypeBool,
+							Description: "enabled",
+							Optional:    true,
+							Computed:    true,
+							ForceNew:    false,
+						},
+					},
+				},
+			},
 			"autoscale": {
 				Type:        schema.TypeBool,
 				Description: "Enable auto-scaling for the pool",
