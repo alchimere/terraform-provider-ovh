@@ -24,7 +24,7 @@ func TestAccCloudProjectKubeNodesDataSource_basic(t *testing.T) {
 		PreCheck: func() {
 			testAccPreCheckKubernetes(t)
 		},
-		Providers: testAccProviders,
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: config,
@@ -50,7 +50,7 @@ func TestAccCloudProjectKubeNodesDataSource_basic(t *testing.T) {
 					resource.TestCheckResourceAttrSet(
 						"data.ovh_cloud_project_kube_nodes.nodesDataSource", "nodes.0.version"),
 					resource.TestCheckResourceAttr(
-						"data.ovh_cloud_project_kube_nodes.nodesDataSource", "nodes.0.flavor", "b2-7"),
+						"data.ovh_cloud_project_kube_nodes.nodesDataSource", "nodes.0.flavor", "b3-8"),
 					resource.TestCheckResourceAttr(
 						"data.ovh_cloud_project_kube_nodes.nodesDataSource", "nodes.0.project_id", os.Getenv("OVH_CLOUD_PROJECT_SERVICE_TEST")),
 				),
@@ -70,7 +70,7 @@ resource "ovh_cloud_project_kube_nodepool" "pool" {
 	service_name  = ovh_cloud_project_kube.cluster.service_name
 	kube_id       = ovh_cloud_project_kube.cluster.id
 	name          = ovh_cloud_project_kube.cluster.name
-	flavor_name   = "b2-7"
+	flavor_name   = "b3-8"
 	desired_nodes = 1
 	min_nodes     = 0
 	max_nodes     = 2

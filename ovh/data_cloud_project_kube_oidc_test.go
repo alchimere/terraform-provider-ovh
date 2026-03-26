@@ -24,7 +24,7 @@ func TestAccCloudProjectKubeOIDCDataSource_basic(t *testing.T) {
 		PreCheck: func() {
 			testAccPreCheckKubernetes(t)
 		},
-		Providers: testAccProviders,
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			{
 				Config: config,

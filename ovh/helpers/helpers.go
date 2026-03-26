@@ -2,12 +2,14 @@ package helpers
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net"
 	"strings"
 	"time"
 
 	"github.com/hashicorp/go-cty/cty"
+	frameworkresource "github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -382,6 +384,28 @@ func CheckDeleted(d *schema.ResourceData, err error, endpoint string) error {
 	}
 
 	return fmt.Errorf("calling %s:\n\t %s", endpoint, err.Error())
+}
+
+// CheckDeletedWithContext checks the error to see if it's a 404 (Not Found) and, if so,
+// removes the resource from state instead of throwing an error.
+func CheckDeletedWithContext(ctx context.Context, resp *frameworkresource.ReadResponse, err error, endpoint string) {
+	errOvh, ok := err.(*ovh.APIError)
+	if ok {
+		if errOvh.Code == 404 {
+			resp.State.RemoveResource(ctx)
+			return
+		}
+		resp.Diagnostics.AddError(
+			fmt.Sprintf("calling %s", endpoint),
+			fmt.Sprintf("%s Query ID: %s", err, errOvh.QueryID),
+		)
+		return
+	}
+
+	resp.Diagnostics.AddError(
+		fmt.Sprintf("calling %s", endpoint),
+		err.Error(),
+	)
 }
 
 func StringsFromSchema(d *schema.ResourceData, id string) ([]string, error) {

@@ -1,452 +1,955 @@
 package ovh
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"math/big"
+	"net/url"
+	"os"
 	"strings"
 	"time"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/retry"
 	"github.com/ovh/go-ovh/ovh"
 	"github.com/ovh/terraform-provider-ovh/v2/ovh/helpers"
 	"github.com/ovh/terraform-provider-ovh/v2/ovh/ovhwrap"
+	ovhtypes "github.com/ovh/terraform-provider-ovh/v2/ovh/types"
 )
 
-func resourceCloudProjectKubeNodePool() *schema.Resource {
-	return &schema.Resource{
-		Create: resourceCloudProjectKubeNodePoolCreate,
-		Read:   resourceCloudProjectKubeNodePoolRead,
-		Delete: resourceCloudProjectKubeNodePoolDelete,
-		Update: resourceCloudProjectKubeNodePoolUpdate,
+// --- Resource struct ---
 
-		Importer: &schema.ResourceImporter{
-			State: resourceCloudProjectKubeNodePoolImportState,
-		},
+type cloudProjectKubeNodePoolResource struct {
+	config *Config
+}
 
-		Timeouts: &schema.ResourceTimeout{
-			Create:  schema.DefaultTimeout(time.Hour),
-			Update:  schema.DefaultTimeout(time.Hour),
-			Delete:  schema.DefaultTimeout(time.Hour),
-			Read:    schema.DefaultTimeout(5 * time.Minute),
-			Default: schema.DefaultTimeout(10 * time.Minute),
-		},
+func NewCloudProjectKubeNodePoolResource() resource.Resource {
+	return &cloudProjectKubeNodePoolResource{}
+}
 
-		Schema: map[string]*schema.Schema{
-			"service_name": {
-				Type:        schema.TypeString,
+// Ensure the implementation satisfies the expected interfaces.
+var (
+	_ resource.Resource                = &cloudProjectKubeNodePoolResource{}
+	_ resource.ResourceWithConfigure   = &cloudProjectKubeNodePoolResource{}
+	_ resource.ResourceWithImportState = &cloudProjectKubeNodePoolResource{}
+)
+
+// --- Model ---
+
+type cloudProjectKubeNodePoolResourceModel struct {
+	ID                                       ovhtypes.TfStringValue                             `tfsdk:"id"`
+	ServiceName                              ovhtypes.TfStringValue                             `tfsdk:"service_name"`
+	KubeId                                   ovhtypes.TfStringValue                             `tfsdk:"kube_id"`
+	Name                                     ovhtypes.TfStringValue                             `tfsdk:"name" json:"name"`
+	Autoscale                                ovhtypes.TfBoolValue                               `tfsdk:"autoscale" json:"autoscale"`
+	AntiAffinity                             ovhtypes.TfBoolValue                               `tfsdk:"anti_affinity" json:"antiAffinity"`
+	FlavorName                               ovhtypes.TfStringValue                             `tfsdk:"flavor_name"`
+	DesiredNodes                             ovhtypes.TfInt64Value                              `tfsdk:"desired_nodes" json:"desiredNodes"`
+	MaxNodes                                 ovhtypes.TfInt64Value                              `tfsdk:"max_nodes" json:"maxNodes"`
+	MinNodes                                 ovhtypes.TfInt64Value                              `tfsdk:"min_nodes" json:"minNodes"`
+	MonthlyBilled                            ovhtypes.TfBoolValue                               `tfsdk:"monthly_billed" json:"monthlyBilled"`
+	AvailableNodes                           ovhtypes.TfInt64Value                              `tfsdk:"available_nodes" json:"availableNodes"`
+	CreatedAt                                ovhtypes.TfStringValue                             `tfsdk:"created_at" json:"createdAt"`
+	CurrentNodes                             ovhtypes.TfInt64Value                              `tfsdk:"current_nodes" json:"currentNodes"`
+	Flavor                                   ovhtypes.TfStringValue                             `tfsdk:"flavor" json:"flavor"`
+	ProjectId                                ovhtypes.TfStringValue                             `tfsdk:"project_id" json:"projectId"`
+	SizeStatus                               ovhtypes.TfStringValue                             `tfsdk:"size_status" json:"sizeStatus"`
+	Status                                   ovhtypes.TfStringValue                             `tfsdk:"status" json:"status"`
+	UpToDateNodes                            ovhtypes.TfInt64Value                              `tfsdk:"up_to_date_nodes" json:"upToDateNodes"`
+	UpdatedAt                                ovhtypes.TfStringValue                             `tfsdk:"updated_at" json:"updatedAt"`
+	Autoscaling                              cloudProjectKubeNodePoolAutoscalingJSON            `tfsdk:"-" json:"autoscaling"`
+	AutoscalingScaleDownUnneededTimeSeconds  ovhtypes.TfInt64Value                              `tfsdk:"autoscaling_scale_down_unneeded_time_seconds"`
+	AutoscalingScaleDownUnreadyTimeSeconds   ovhtypes.TfInt64Value                              `tfsdk:"autoscaling_scale_down_unready_time_seconds"`
+	AutoscalingScaleDownUtilizationThreshold ovhtypes.TfNumberValue                             `tfsdk:"autoscaling_scale_down_utilization_threshold"`
+	Template                                 NodePoolTemplateValue                              `tfsdk:"template" json:"template"`
+	AvailabilityZones                        ovhtypes.TfListNestedValue[ovhtypes.TfStringValue] `tfsdk:"availability_zones" json:"availabilityZones"`
+}
+
+// --- Metadata / Configure / Schema ---
+
+func (r *cloudProjectKubeNodePoolResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_cloud_project_kube_nodepool"
+}
+
+func (r *cloudProjectKubeNodePoolResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+	if req.ProviderData == nil {
+		return
+	}
+
+	config, ok := req.ProviderData.(*Config)
+	if !ok {
+		resp.Diagnostics.AddError(
+			"Unexpected Resource Configure Type",
+			fmt.Sprintf("Expected *Config, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+		)
+		return
+	}
+
+	r.config = config
+}
+
+func (r *cloudProjectKubeNodePoolResource) Schema(ctx context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = schema.Schema{
+		Attributes: map[string]schema.Attribute{
+			"id": schema.StringAttribute{
+				CustomType: ovhtypes.TfStringType{},
+				Computed:   true,
+			},
+			"service_name": schema.StringAttribute{
+				CustomType:  ovhtypes.TfStringType{},
+				Required:    os.Getenv("OVH_CLOUD_PROJECT_SERVICE") == "",
+				Optional:    os.Getenv("OVH_CLOUD_PROJECT_SERVICE") != "",
 				Description: "Service name",
-				Required:    true,
-				ForceNew:    true,
-				DefaultFunc: schema.EnvDefaultFunc("OVH_CLOUD_PROJECT_SERVICE", nil),
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
-			"kube_id": {
-				Type:        schema.TypeString,
+			"kube_id": schema.StringAttribute{
+				CustomType:  ovhtypes.TfStringType{},
+				Required:    true,
 				Description: "Kube ID",
-				Required:    true,
-				ForceNew:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
-			"autoscale": {
-				Type:        schema.TypeBool,
-				Description: "Enable auto-scaling for the pool",
+			"name": schema.StringAttribute{
+				CustomType:  ovhtypes.TfStringType{},
 				Optional:    true,
 				Computed:    true,
-				ForceNew:    false,
-			},
-			"autoscaling_scale_down_unneeded_time_seconds": {
-				Description: "scaleDownUnneededTimeSeconds for autoscaling",
-				Optional:    true,
-				Computed:    true,
-				Type:        schema.TypeInt,
-			},
-			"autoscaling_scale_down_unready_time_seconds": {
-				Description: "scaleDownUnreadyTimeSeconds for autoscaling",
-				Optional:    true,
-				Computed:    true,
-				Type:        schema.TypeInt,
-			},
-			"autoscaling_scale_down_utilization_threshold": {
-				Description: "scaleDownUtilizationThreshold for autoscaling",
-				Optional:    true,
-				Computed:    true,
-				Type:        schema.TypeFloat,
-			},
-			"anti_affinity": {
-				Type:        schema.TypeBool,
-				Description: "Enable anti affinity groups for nodes in the pool",
-				Optional:    true,
-				Computed:    true,
-				ForceNew:    true,
-			},
-			"flavor_name": {
-				Type:        schema.TypeString,
-				Description: "Flavor name",
-				Required:    true,
-				ForceNew:    true,
-			},
-			"desired_nodes": {
-				Type:        schema.TypeInt,
-				Description: "Number of nodes you desire in the pool",
-				Optional:    true,
-				Computed:    true,
-			},
-			"name": {
-				Type:        schema.TypeString,
 				Description: "NodePool resource name",
-				Optional:    true,
-				Computed:    true,
-				ForceNew:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
-			"max_nodes": {
-				Type:        schema.TypeInt,
-				Description: "Number of nodes you desire in the pool",
-				Computed:    true,
-				Optional:    true,
-			},
-			"min_nodes": {
-				Type:        schema.TypeInt,
-				Description: "Number of nodes you desire in the pool",
-				Computed:    true,
-				Optional:    true,
-			},
-			"monthly_billed": {
-				Type:        schema.TypeBool,
-				Description: "Enable monthly billing on all nodes in the pool",
-				Optional:    true,
-				Computed:    true,
-				ForceNew:    true,
-			},
-
-			// computed
-			"available_nodes": {
-				Type:        schema.TypeInt,
-				Description: "Number of nodes which are actually ready in the pool",
-				Computed:    true,
-			},
-			"created_at": {
-				Type:        schema.TypeString,
-				Description: "Creation date",
-				Computed:    true,
-			},
-			"current_nodes": {
-				Type:        schema.TypeInt,
-				Description: "Number of nodes present in the pool",
-				Computed:    true,
-			},
-			"flavor": {
-				Type:        schema.TypeString,
+			"flavor_name": schema.StringAttribute{
+				CustomType:  ovhtypes.TfStringType{},
+				Required:    true,
 				Description: "Flavor name",
-				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
-			"project_id": {
-				Type:        schema.TypeString,
-				Description: "Project id",
-				Computed:    true,
-			},
-			"size_status": {
-				Type:        schema.TypeString,
-				Description: "Status describing the state between number of nodes wanted and available ones",
-				Computed:    true,
-			},
-			"status": {
-				Type:        schema.TypeString,
-				Description: "Current status",
-				Computed:    true,
-			},
-			"up_to_date_nodes": {
-				Type:        schema.TypeInt,
-				Description: "Number of nodes with latest version installed in the pool",
-				Computed:    true,
-			},
-			"updated_at": {
-				Type:        schema.TypeString,
-				Description: "Last update date",
-				Computed:    true,
-			},
-			"template": {
-				Description: "Node pool template",
+			"autoscale": schema.BoolAttribute{
+				CustomType:  ovhtypes.TfBoolType{},
 				Optional:    true,
-				Type:        schema.TypeSet,
-				MaxItems:    1,
-				Set:         CustomSchemaSetFunc(),
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"metadata": {
-							Description: "metadata",
-							Required:    true,
-							Type:        schema.TypeSet,
-							MaxItems:    1,
-							Set:         CustomSchemaSetFunc(),
-							Elem: &schema.Resource{
-								Schema: map[string]*schema.Schema{
-									"finalizers": {
-										Description: "finalizers",
-										Required:    true,
-										Type:        schema.TypeList,
-										Elem:        &schema.Schema{Type: schema.TypeString},
-									},
-									"labels": {
-										Description: "labels",
-										Required:    true,
-										Type:        schema.TypeMap,
-										Elem:        &schema.Schema{Type: schema.TypeString},
-										Set:         schema.HashString,
-									},
-									"annotations": {
-										Description: "annotations",
-										Required:    true,
-										Type:        schema.TypeMap,
-										Elem:        &schema.Schema{Type: schema.TypeString},
-										Set:         schema.HashString,
-									},
-								},
+				Computed:    true,
+				Description: "Enable auto-scaling for the pool",
+			},
+			"anti_affinity": schema.BoolAttribute{
+				CustomType:  ovhtypes.TfBoolType{},
+				Optional:    true,
+				Computed:    true,
+				Description: "Enable anti affinity groups for nodes in the pool",
+				PlanModifiers: []planmodifier.Bool{
+					// boolplanmodifier.RequiresReplace(),
+					boolplanmodifier.RequiresReplaceIf(
+						func(ctx context.Context, req planmodifier.BoolRequest, resp *boolplanmodifier.RequiresReplaceIfFuncResponse) {
+							// If not specified in config, allow server to set without replacement
+							if req.ConfigValue.IsNull() {
+								return
+							}
+							// If plan is unknown, defer replacement decision
+							if req.PlanValue.IsUnknown() {
+								return
+							}
+							// If specified, known, and changed from state, require replacement
+							if !req.PlanValue.Equal(req.StateValue) {
+								resp.RequiresReplace = true
+							}
+						},
+						"Only replace when user specifies anti_affinity and it differs from state",
+						"Only replace when user specifies anti_affinity and it differs from state",
+					),
+				},
+			},
+			"desired_nodes": schema.Int64Attribute{
+				CustomType:  ovhtypes.TfInt64Type{},
+				Optional:    true,
+				Computed:    true,
+				Description: "Number of nodes you desire in the pool",
+			},
+			"max_nodes": schema.Int64Attribute{
+				CustomType:  ovhtypes.TfInt64Type{},
+				Optional:    true,
+				Computed:    true,
+				Description: "Number of nodes you desire in the pool",
+			},
+			"min_nodes": schema.Int64Attribute{
+				CustomType:  ovhtypes.TfInt64Type{},
+				Optional:    true,
+				Computed:    true,
+				Description: "Number of nodes you desire in the pool",
+			},
+			"monthly_billed": schema.BoolAttribute{
+				CustomType:  ovhtypes.TfBoolType{},
+				Optional:    true,
+				Computed:    true,
+				Description: "Enable monthly billing on all nodes in the pool",
+				PlanModifiers: []planmodifier.Bool{
+					// boolplanmodifier.RequiresReplace(),
+					boolplanmodifier.RequiresReplaceIf(
+						func(ctx context.Context, req planmodifier.BoolRequest, resp *boolplanmodifier.RequiresReplaceIfFuncResponse) {
+							// If not specified in config, allow server to set without replacement
+							if req.ConfigValue.IsNull() {
+								return
+							}
+							// If plan is unknown, defer replacement decision
+							if req.PlanValue.IsUnknown() {
+								return
+							}
+							// If specified, known, and changed from state, require replacement
+							if !req.PlanValue.Equal(req.StateValue) {
+								resp.RequiresReplace = true
+							}
+						},
+						"Only replace when user specifies monthly_billed and it differs from state",
+						"Only replace when user specifies monthly_billed and it differs from state",
+					),
+				},
+			},
+			// Computed-only
+			"available_nodes": schema.Int64Attribute{
+				CustomType:  ovhtypes.TfInt64Type{},
+				Computed:    true,
+				Description: "Number of nodes which are actually ready in the pool",
+			},
+			"created_at": schema.StringAttribute{
+				CustomType:  ovhtypes.TfStringType{},
+				Computed:    true,
+				Description: "Creation date",
+			},
+			"current_nodes": schema.Int64Attribute{
+				CustomType:  ovhtypes.TfInt64Type{},
+				Computed:    true,
+				Description: "Number of nodes present in the pool",
+			},
+			"flavor": schema.StringAttribute{
+				CustomType:  ovhtypes.TfStringType{},
+				Computed:    true,
+				Description: "Flavor name",
+			},
+			"project_id": schema.StringAttribute{
+				CustomType:  ovhtypes.TfStringType{},
+				Computed:    true,
+				Description: "Project id",
+			},
+			"size_status": schema.StringAttribute{
+				CustomType:  ovhtypes.TfStringType{},
+				Computed:    true,
+				Description: "Status describing the state between number of nodes wanted and available ones",
+			},
+			"status": schema.StringAttribute{
+				CustomType:  ovhtypes.TfStringType{},
+				Computed:    true,
+				Description: "Current status",
+			},
+			"up_to_date_nodes": schema.Int64Attribute{
+				CustomType:  ovhtypes.TfInt64Type{},
+				Computed:    true,
+				Description: "Number of nodes with latest version installed in the pool",
+			},
+			"updated_at": schema.StringAttribute{
+				CustomType:  ovhtypes.TfStringType{},
+				Computed:    true,
+				Description: "Last update date",
+			},
+			"autoscaling_scale_down_unneeded_time_seconds": schema.Int64Attribute{
+				CustomType:  ovhtypes.TfInt64Type{},
+				Optional:    true,
+				Computed:    true,
+				Description: "scaleDownUnneededTimeSeconds for autoscaling",
+			},
+			"autoscaling_scale_down_unready_time_seconds": schema.Int64Attribute{
+				CustomType:  ovhtypes.TfInt64Type{},
+				Optional:    true,
+				Computed:    true,
+				Description: "scaleDownUnreadyTimeSeconds for autoscaling",
+			},
+			"autoscaling_scale_down_utilization_threshold": schema.NumberAttribute{
+				CustomType:  ovhtypes.TfNumberType{},
+				Optional:    true,
+				Computed:    true,
+				Description: "scaleDownUtilizationThreshold for autoscaling",
+			},
+			"availability_zones": schema.ListAttribute{
+				CustomType:  ovhtypes.NewTfListNestedType[ovhtypes.TfStringValue](ctx),
+				Optional:    true,
+				Computed:    true,
+				Description: "Availability zones",
+				PlanModifiers: []planmodifier.List{
+					// listplanmodifier.RequiresReplace(),
+					listplanmodifier.RequiresReplaceIf(
+						func(ctx context.Context, req planmodifier.ListRequest, resp *listplanmodifier.RequiresReplaceIfFuncResponse) {
+							// If not specified in config, allow server to set without replacement
+							if req.ConfigValue.IsNull() {
+								return
+							}
+							// If plan is unknown, defer replacement decision
+							if req.PlanValue.IsUnknown() {
+								return
+							}
+							// If specified, known, and changed from state, require replacement
+							if !req.PlanValue.Equal(req.StateValue) {
+								resp.RequiresReplace = true
+							}
+						},
+						"Only replace when user specifies availability_zones and it differs from state",
+						"Only replace when user specifies availability_zones and it differs from state",
+					),
+				},
+			},
+		},
+		Blocks: map[string]schema.Block{
+			"template": schema.SingleNestedBlock{
+				Blocks: map[string]schema.Block{ //},
+					"metadata": schema.SingleNestedBlock{
+						Attributes: map[string]schema.Attribute{
+							"finalizers": schema.ListAttribute{
+								CustomType:  ovhtypes.NewTfListNestedType[ovhtypes.TfStringValue](ctx),
+								Optional:    true,
+								Description: "finalizers",
+							},
+							"labels": schema.MapAttribute{
+								CustomType:  ovhtypes.NewTfMapNestedType[ovhtypes.TfStringValue](ctx),
+								Optional:    true,
+								Description: "labels",
+							},
+							"annotations": schema.MapAttribute{
+								CustomType:  ovhtypes.NewTfMapNestedType[ovhtypes.TfStringValue](ctx),
+								Optional:    true,
+								Description: "annotations",
 							},
 						},
-						"spec": {
-							Description: "spec",
-							Required:    true,
-							Type:        schema.TypeSet,
-							MaxItems:    1,
-							Set:         CustomSchemaSetFunc(),
-							Elem: &schema.Resource{
-								Schema: map[string]*schema.Schema{
-									"unschedulable": {
-										Description: "unschedulable",
-										Required:    true,
-										Type:        schema.TypeBool,
+						CustomType: NodePoolTemplateMetadataType{
+							ObjectType: types.ObjectType{
+								AttrTypes: NodePoolTemplateMetadataValue{}.AttributeTypes(ctx),
+							},
+						},
+						Description: "metadata",
+					},
+					"spec": schema.SingleNestedBlock{
+						Attributes: map[string]schema.Attribute{
+							"unschedulable": schema.BoolAttribute{
+								CustomType:  ovhtypes.TfBoolType{},
+								Optional:    true,
+								Description: "unschedulable",
+							},
+							"taints": schema.ListNestedAttribute{
+								NestedObject: schema.NestedAttributeObject{
+									Attributes: map[string]schema.Attribute{
+										"effect": schema.StringAttribute{
+											CustomType:  ovhtypes.TfStringType{},
+											Required:    true,
+											Description: "effect",
+										},
+										"key": schema.StringAttribute{
+											CustomType:  ovhtypes.TfStringType{},
+											Required:    true,
+											Description: "key",
+										},
+										"value": schema.StringAttribute{
+											CustomType:  ovhtypes.TfStringType{},
+											Optional:    true,
+											Computed:    true,
+											Description: "value",
+										},
 									},
-									"taints": {
-										Description: "taints",
-										Required:    true,
-										Type:        schema.TypeList,
-										Elem: &schema.Schema{
-											Type: schema.TypeMap,
-											Set:  schema.HashString,
-											ValidateFunc: func(taintInterface interface{}, path string) (warning []string, errorList []error) {
-												taint := taintInterface.(map[string]interface{})
-
-												if taint["key"] == nil {
-													return nil, []error{fmt.Errorf("key attribute is mandatory for taint: %s", path)}
-												}
-
-												if taint["effect"] == nil {
-													return nil, []error{fmt.Errorf("effect attribute is mandatory for taint: %s", path)}
-												}
-
-												effectString := taint["effect"].(string)
-												effect := TaintEffecTypeToID[effectString]
-												if effect == NotATaint {
-													return nil, []error{fmt.Errorf("effect: %s is not a allowable taint %#v", effectString, TaintEffecTypeToID)}
-												}
-
-												return nil, nil
-											},
+									CustomType: NodePoolTaintType{
+										ObjectType: types.ObjectType{
+											AttrTypes: NodePoolTaintValue{}.AttributeTypes(ctx),
 										},
 									},
 								},
+								CustomType:  ovhtypes.NewTfListNestedType[NodePoolTaintValue](ctx),
+								Optional:    true,
+								Description: "taints",
 							},
 						},
+						CustomType: NodePoolTemplateSpecType{
+							ObjectType: types.ObjectType{
+								AttrTypes: NodePoolTemplateSpecValue{}.AttributeTypes(ctx),
+							},
+						},
+						Description: "spec",
 					},
 				},
-			},
-			"availability_zones": {
-				Type:     schema.TypeList,
-				Optional: true,
-				ForceNew: true,
-				Elem: &schema.Schema{
-					Type: schema.TypeString,
+				CustomType: NodePoolTemplateType{
+					ObjectType: types.ObjectType{
+						AttrTypes: NodePoolTemplateValue{}.AttributeTypes(ctx),
+					},
 				},
+				Description: "Node pool template",
 			},
 		},
 	}
 }
 
-func resourceCloudProjectKubeNodePoolImportState(d *schema.ResourceData, meta interface{}) ([]*schema.ResourceData, error) {
-	givenId := d.Id()
-	splitId := strings.SplitN(givenId, "/", 3)
-	if len(splitId) != 3 {
-		return nil, fmt.Errorf("import Id is not service_name/kubeid/poolid formatted")
+// --- CRUD ---
+
+func (r *cloudProjectKubeNodePoolResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	var data cloudProjectKubeNodePoolResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
 	}
-	serviceName := splitId[0]
-	kubeId := splitId[1]
-	id := splitId[2]
-	d.SetId(id)
-	d.Set("kube_id", kubeId)
-	d.Set("service_name", serviceName)
 
-	results := make([]*schema.ResourceData, 1)
-	results[0] = d
-	return results, nil
-}
-
-func resourceCloudProjectKubeNodePoolCreate(d *schema.ResourceData, meta interface{}) error {
-	config := meta.(*Config)
-	serviceName := d.Get("service_name").(string)
-	kubeId := d.Get("kube_id").(string)
-
-	endpoint := fmt.Sprintf("/cloud/project/%s/kube/%s/nodepool", serviceName, kubeId)
-	params, err := (&CloudProjectKubeNodePoolCreateOpts{}).FromResource(d)
-	if err != nil {
-		return err
+	if data.ServiceName.IsNull() {
+		data.ServiceName = ovhtypes.NewTfStringValue(os.Getenv("OVH_CLOUD_PROJECT_SERVICE"))
 	}
+
+	serviceName := data.ServiceName.ValueString()
+	kubeId := data.KubeId.ValueString()
+
+	endpoint := fmt.Sprintf("/cloud/project/%s/kube/%s/nodepool",
+		url.PathEscape(serviceName),
+		url.PathEscape(kubeId),
+	)
+
+	params := nodePoolCreateOptsFromModel(&data)
 	res := &CloudProjectKubeNodePoolResponse{}
 
 	log.Printf("[DEBUG] Will create nodepool: %+v", params)
-	err = config.OVHClient.Post(endpoint, params, res)
-	if err != nil {
-		return fmt.Errorf("calling Post %s with params %s:\n\t %w", endpoint, params, err)
+	if err := r.config.OVHClient.PostWithContext(ctx, endpoint, params, res); err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to create kube nodepool",
+			fmt.Sprintf("error calling POST %s: %s", endpoint, err),
+		)
+		return
 	}
 
 	// This is a fix for a weird bug where the nodepool is not immediately available on API
 	log.Printf("[DEBUG] Waiting for nodepool %s to be available", res.Id)
-	endpoint = fmt.Sprintf("/cloud/project/%s/kube/%s/nodepool/%s", serviceName, kubeId, res.Id)
-	err = helpers.WaitAvailable(config.OVHClient, endpoint, 2*time.Minute)
-	if err != nil {
-		return err
+	poolEndpoint := fmt.Sprintf("/cloud/project/%s/kube/%s/nodepool/%s",
+		url.PathEscape(serviceName),
+		url.PathEscape(kubeId),
+		url.PathEscape(res.Id),
+	)
+	if err := helpers.WaitAvailable(r.config.OVHClient, poolEndpoint, 2*time.Minute); err != nil {
+		resp.Diagnostics.AddError(
+			"Failed waiting for nodepool to be available",
+			err.Error(),
+		)
+		return
 	}
 
-	log.Printf("[DEBUG] Waiting for nodepool %s to be READY or ERROR", res.Id)
-	err = waitForCloudProjectKubeNodePoolWithStateTarget(config.OVHClient, serviceName, kubeId, res.Id, d.Timeout(schema.TimeoutCreate), []string{"READY", "ERROR"})
-	if err != nil {
-		return fmt.Errorf("timeout while waiting nodepool %s to be READY: %w", res.Id, err)
+	log.Printf("[DEBUG] Waiting for nodepool %s to be READY", res.Id)
+	if err := waitForCloudProjectKubeNodePoolReadyCtx(ctx, r.config.OVHClient, serviceName, kubeId, res.Id, time.Hour); err != nil {
+		resp.Diagnostics.AddError(
+			"Timeout waiting for nodepool to be READY",
+			fmt.Sprintf("timeout while waiting nodepool %s to be READY: %s", res.Id, err),
+		)
+		return
 	}
 	log.Printf("[DEBUG] nodepool %s is READY", res.Id)
 
-	d.SetId(res.Id)
-
-	return resourceCloudProjectKubeNodePoolRead(d, meta)
-}
-
-func resourceCloudProjectKubeNodePoolRead(d *schema.ResourceData, meta interface{}) error {
-	config := meta.(*Config)
-	serviceName := d.Get("service_name").(string)
-	kubeId := d.Get("kube_id").(string)
-
-	endpoint := fmt.Sprintf("/cloud/project/%s/kube/%s/nodepool/%s", serviceName, kubeId, d.Id())
-	res := &CloudProjectKubeNodePoolResponse{}
-
-	log.Printf("[DEBUG] Will read nodepool %s from cluster %s in project %s", d.Id(), kubeId, serviceName)
-	if err := config.OVHClient.Get(endpoint, res); err != nil {
-		return helpers.CheckDeleted(d, err, endpoint)
+	// Read back the resource
+	if err := r.readNodePool(ctx, serviceName, kubeId, res.Id, &data); err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to read kube nodepool after create",
+			err.Error(),
+		)
+		return
 	}
 
-	for k, v := range res.ToMap() {
-		if k != "id" {
-			d.Set(k, v)
-		} else {
-			d.SetId(fmt.Sprint(v))
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
+
+func (r *cloudProjectKubeNodePoolResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	var data cloudProjectKubeNodePoolResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	serviceName := data.ServiceName.ValueString()
+	kubeId := data.KubeId.ValueString()
+	poolId := data.ID.ValueString()
+
+	endpoint := fmt.Sprintf("/cloud/project/%s/kube/%s/nodepool/%s",
+		url.PathEscape(serviceName),
+		url.PathEscape(kubeId),
+		url.PathEscape(poolId),
+	)
+
+	log.Printf("[DEBUG] Will read nodepool %s from cluster %s in project %s", poolId, kubeId, serviceName)
+
+	// Save template state before read so we can restore null if user didn't specify one
+	templateWasNull := data.Template.IsNull()
+
+	var res cloudProjectKubeNodePoolResourceModel
+	if err := r.config.OVHClient.GetWithContext(ctx, endpoint, &res); err != nil {
+		helpers.CheckDeletedWithContext(ctx, resp, err, endpoint)
+		return
+	}
+
+	// Preserve service_name and kube_id from state (not returned by API)
+	res.ServiceName = data.ServiceName
+	res.KubeId = data.KubeId
+	res.ID = data.ID
+	res.FlavorName = res.Flavor
+
+	// Flatten autoscaling
+	flattenAutoscaling(&res)
+
+	// Handle template: if user didn't specify one and API returns empty, set null
+	handleTemplateOnRead(&res, templateWasNull)
+
+	log.Printf("[DEBUG] Read nodepool: %+v", res)
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &res)...)
+}
+
+func (r *cloudProjectKubeNodePoolResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var data cloudProjectKubeNodePoolResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Get pool ID from state
+	var state cloudProjectKubeNodePoolResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	serviceName := data.ServiceName.ValueString()
+	kubeId := data.KubeId.ValueString()
+	poolId := state.ID.ValueString()
+
+	endpoint := fmt.Sprintf("/cloud/project/%s/kube/%s/nodepool/%s",
+		url.PathEscape(serviceName),
+		url.PathEscape(kubeId),
+		url.PathEscape(poolId),
+	)
+
+	params := nodePoolUpdateOptsFromModel(&data)
+
+	log.Printf("[DEBUG] Will update nodepool: %+v", params)
+	if err := r.config.OVHClient.PutWithContext(ctx, endpoint, params, nil); err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to update kube nodepool",
+			fmt.Sprintf("error calling PUT %s: %s", endpoint, err),
+		)
+		return
+	}
+
+	log.Printf("[DEBUG] Waiting for nodepool %s to be READY", poolId)
+	if err := waitForCloudProjectKubeNodePoolReadyCtx(ctx, r.config.OVHClient, serviceName, kubeId, poolId, time.Hour); err != nil {
+		resp.Diagnostics.AddError(
+			"Timeout waiting for nodepool to be READY",
+			fmt.Sprintf("timeout while waiting nodepool %s to be READY: %s", poolId, err),
+		)
+		return
+	}
+	log.Printf("[DEBUG] nodepool %s is READY", poolId)
+
+	// Read back the resource
+	if err := r.readNodePool(ctx, serviceName, kubeId, poolId, &data); err != nil {
+		resp.Diagnostics.AddError(
+			"Failed to read kube nodepool after update",
+			err.Error(),
+		)
+		return
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
+}
+
+func (r *cloudProjectKubeNodePoolResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var data cloudProjectKubeNodePoolResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	serviceName := data.ServiceName.ValueString()
+	kubeId := data.KubeId.ValueString()
+	poolId := data.ID.ValueString()
+
+	endpoint := fmt.Sprintf("/cloud/project/%s/kube/%s/nodepool/%s",
+		url.PathEscape(serviceName),
+		url.PathEscape(kubeId),
+		url.PathEscape(poolId),
+	)
+
+	log.Printf("[DEBUG] Will delete nodepool %s from cluster %s in project %s", poolId, kubeId, serviceName)
+	if err := r.config.OVHClient.DeleteWithContext(ctx, endpoint, nil); err != nil {
+		if errOvh, ok := err.(*ovh.APIError); ok && errOvh.Code == 404 {
+			// Already deleted
+			return
+		}
+		resp.Diagnostics.AddError(
+			"Failed to delete kube nodepool",
+			fmt.Sprintf("error calling DELETE %s: %s", endpoint, err),
+		)
+		return
+	}
+
+	log.Printf("[DEBUG] Waiting for nodepool %s to be DELETED", poolId)
+	if err := waitForCloudProjectKubeNodePoolDeletedCtx(ctx, r.config.OVHClient, serviceName, kubeId, poolId, time.Hour); err != nil {
+		resp.Diagnostics.AddError(
+			"Timeout waiting for nodepool to be DELETED",
+			fmt.Sprintf("timeout while waiting nodepool %s to be DELETED: %s", poolId, err),
+		)
+		return
+	}
+	log.Printf("[DEBUG] nodepool %s is DELETED", poolId)
+}
+
+func (r *cloudProjectKubeNodePoolResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	splits := strings.SplitN(req.ID, "/", 3)
+	if len(splits) != 3 {
+		resp.Diagnostics.AddError(
+			"Given ID is malformed",
+			"ID must be formatted as: service_name/kube_id/pool_id",
+		)
+		return
+	}
+
+	serviceName := splits[0]
+	kubeId := splits[1]
+	poolId := splits[2]
+
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), poolId)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("service_name"), serviceName)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("kube_id"), kubeId)...)
+}
+
+// --- Helpers ---
+
+// readNodePool reads a nodepool from the API and populates the model.
+func (r *cloudProjectKubeNodePoolResource) readNodePool(ctx context.Context, serviceName, kubeId, poolId string, data *cloudProjectKubeNodePoolResourceModel) error {
+	endpoint := fmt.Sprintf("/cloud/project/%s/kube/%s/nodepool/%s",
+		url.PathEscape(serviceName),
+		url.PathEscape(kubeId),
+		url.PathEscape(poolId),
+	)
+
+	// Save template state before read
+	templateWasNull := data.Template.IsNull()
+
+	var res cloudProjectKubeNodePoolResourceModel
+	if err := r.config.OVHClient.GetWithContext(ctx, endpoint, &res); err != nil {
+		return fmt.Errorf("error calling GET %s: %w", endpoint, err)
+	}
+
+	// Preserve identifiers
+	res.ServiceName = data.ServiceName
+	res.KubeId = data.KubeId
+	res.ID = ovhtypes.NewTfStringValue(poolId)
+	res.FlavorName = res.Flavor
+
+	// Flatten autoscaling
+	flattenAutoscaling(&res)
+
+	// Handle template
+	handleTemplateOnRead(&res, templateWasNull)
+
+	*data = res
+	return nil
+}
+
+// flattenAutoscaling flattens the nested autoscaling JSON into top-level attributes.
+func flattenAutoscaling(data *cloudProjectKubeNodePoolResourceModel) {
+	autoscaling := data.Autoscaling
+	if autoscaling.ScaleDownUnneededTimeSeconds != nil {
+		data.AutoscalingScaleDownUnneededTimeSeconds = ovhtypes.TfInt64Value{
+			Int64Value: basetypes.NewInt64Value(*autoscaling.ScaleDownUnneededTimeSeconds),
+		}
+	}
+	if autoscaling.ScaleDownUnreadyTimeSeconds != nil {
+		data.AutoscalingScaleDownUnreadyTimeSeconds = ovhtypes.TfInt64Value{
+			Int64Value: basetypes.NewInt64Value(*autoscaling.ScaleDownUnreadyTimeSeconds),
+		}
+	}
+	if autoscaling.ScaleDownUtilizationThreshold != nil {
+		data.AutoscalingScaleDownUtilizationThreshold = ovhtypes.TfNumberValue{
+			NumberValue: basetypes.NewNumberValue(big.NewFloat(*autoscaling.ScaleDownUtilizationThreshold)),
+		}
+	}
+}
+
+// handleTemplateOnRead sets template to null if the user didn't specify one
+// and the API returned an empty template.
+func handleTemplateOnRead(data *cloudProjectKubeNodePoolResourceModel, templateWasNull bool) {
+	if templateWasNull && isEmptyTemplate(data.Template) {
+		data.Template = NewNodePoolTemplateValueNull()
+	}
+}
+
+// isEmptyTemplate checks if a template value is semantically empty.
+func isEmptyTemplate(tmpl NodePoolTemplateValue) bool {
+	if tmpl.IsNull() || tmpl.IsUnknown() {
+		return true
+	}
+
+	metadata := tmpl.Metadata
+	spec := tmpl.Spec
+
+	if metadata.IsNull() || metadata.IsUnknown() {
+		// metadata missing means empty
+	} else {
+		if len(metadata.Annotations.Elements()) > 0 {
+			return false
+		}
+		if len(metadata.Finalizers.Elements()) > 0 {
+			return false
+		}
+		if len(metadata.Labels.Elements()) > 0 {
+			return false
 		}
 	}
 
-	log.Printf("[DEBUG] Read nodepool: %+v", res)
-	return nil
+	if spec.IsNull() || spec.IsUnknown() {
+		// spec missing means empty
+	} else {
+		if len(spec.Taints.Elements()) > 0 {
+			return false
+		}
+		if !spec.Unschedulable.IsNull() && !spec.Unschedulable.IsUnknown() && spec.Unschedulable.ValueBool() {
+			return false
+		}
+	}
+
+	return true
 }
 
-func resourceCloudProjectKubeNodePoolUpdate(d *schema.ResourceData, meta interface{}) error {
-	config := meta.(*Config)
-	serviceName := d.Get("service_name").(string)
-	kubeId := d.Get("kube_id").(string)
-
-	endpoint := fmt.Sprintf("/cloud/project/%s/kube/%s/nodepool/%s", serviceName, kubeId, d.Id())
-	params, err := (&CloudProjectKubeNodePoolUpdateOpts{}).FromResource(d)
-	if err != nil {
-		return err
+// nodePoolCreateOptsFromModel builds create opts from the framework model.
+func nodePoolCreateOptsFromModel(data *cloudProjectKubeNodePoolResourceModel) *CloudProjectKubeNodePoolCreateOpts {
+	opts := &CloudProjectKubeNodePoolCreateOpts{
+		FlavorName: data.FlavorName.ValueString(),
 	}
 
-	log.Printf("[DEBUG] Will update nodepool: %#v", *params)
-	err = config.OVHClient.Put(endpoint, params, nil)
-	if err != nil {
-		return fmt.Errorf("calling Put %s with params %v:\n\t %w", endpoint, *params, err)
+	if !data.Name.IsNull() && !data.Name.IsUnknown() {
+		name := data.Name.ValueString()
+		opts.Name = &name
 	}
 
-	log.Printf("[DEBUG] Waiting for nodepool %s to be READY", d.Id())
-	err = waitForCloudProjectKubeNodePoolWithStateTarget(config.OVHClient, serviceName, kubeId, d.Id(), d.Timeout(schema.TimeoutUpdate), []string{"READY"})
-	if err != nil {
-		return fmt.Errorf("timeout while waiting nodepool %s to be READY: %w", d.Id(), err)
+	if !data.AntiAffinity.IsNull() && !data.AntiAffinity.IsUnknown() {
+		v := data.AntiAffinity.ValueBool()
+		opts.AntiAffinity = &v
 	}
-	log.Printf("[DEBUG] nodepool %s is READY", d.Id())
 
-	return resourceCloudProjectKubeNodePoolRead(d, meta)
+	if !data.Autoscale.IsNull() && !data.Autoscale.IsUnknown() {
+		v := data.Autoscale.ValueBool()
+		opts.Autoscale = &v
+	}
+
+	if !data.MonthlyBilled.IsNull() && !data.MonthlyBilled.IsUnknown() {
+		v := data.MonthlyBilled.ValueBool()
+		opts.MonthlyBilled = &v
+	}
+
+	if !data.DesiredNodes.IsNull() && !data.DesiredNodes.IsUnknown() {
+		v := int(data.DesiredNodes.ValueInt64())
+		opts.DesiredNodes = &v
+	}
+
+	if !data.MaxNodes.IsNull() && !data.MaxNodes.IsUnknown() {
+		v := int(data.MaxNodes.ValueInt64())
+		opts.MaxNodes = &v
+	}
+
+	if !data.MinNodes.IsNull() && !data.MinNodes.IsUnknown() {
+		v := int(data.MinNodes.ValueInt64())
+		opts.MinNodes = &v
+	}
+
+	if !data.AvailabilityZones.IsNull() && !data.AvailabilityZones.IsUnknown() {
+		azs := stringSliceFromTfList(data.AvailabilityZones)
+		opts.AvailabilityZones = &azs
+	}
+
+	opts.Autoscaling = autoscalingOptsFromModel(data)
+	opts.Template = templateFromModel(data.Template)
+
+	return opts
 }
 
-func resourceCloudProjectKubeNodePoolDelete(d *schema.ResourceData, meta interface{}) error {
-	config := meta.(*Config)
-	serviceName := d.Get("service_name").(string)
-	kubeId := d.Get("kube_id").(string)
+// nodePoolUpdateOptsFromModel builds update opts from the framework model.
+func nodePoolUpdateOptsFromModel(data *cloudProjectKubeNodePoolResourceModel) *CloudProjectKubeNodePoolUpdateOpts {
+	opts := &CloudProjectKubeNodePoolUpdateOpts{}
 
-	endpoint := fmt.Sprintf("/cloud/project/%s/kube/%s/nodepool/%s", serviceName, kubeId, d.Id())
-
-	log.Printf("[DEBUG] Will delete nodepool %s from cluster %s in project %s", d.Id(), kubeId, serviceName)
-	err := config.OVHClient.Delete(endpoint, nil)
-	if err != nil {
-		return helpers.CheckDeleted(d, err, endpoint)
+	if !data.Autoscale.IsNull() && !data.Autoscale.IsUnknown() {
+		v := data.Autoscale.ValueBool()
+		opts.Autoscale = &v
 	}
 
-	log.Printf("[DEBUG] Waiting for nodepool %s to be DELETED", d.Id())
-	err = waitForCloudProjectKubeNodePoolDeleted(config.OVHClient, serviceName, kubeId, d.Id(), d.Timeout(schema.TimeoutDelete))
-	if err != nil {
-		return fmt.Errorf("timeout while waiting nodepool %s to be DELETED: %v", d.Id(), err)
+	if !data.DesiredNodes.IsNull() && !data.DesiredNodes.IsUnknown() {
+		v := int(data.DesiredNodes.ValueInt64())
+		opts.DesiredNodes = &v
 	}
-	log.Printf("[DEBUG] nodepool %s is DELETED", d.Id())
 
-	d.SetId("")
+	if !data.MaxNodes.IsNull() && !data.MaxNodes.IsUnknown() {
+		v := int(data.MaxNodes.ValueInt64())
+		opts.MaxNodes = &v
+	}
 
-	return nil
+	if !data.MinNodes.IsNull() && !data.MinNodes.IsUnknown() {
+		v := int(data.MinNodes.ValueInt64())
+		opts.MinNodes = &v
+	}
+
+	opts.Autoscaling = autoscalingOptsFromModel(data)
+	opts.Template = templateFromModel(data.Template)
+
+	return opts
 }
 
-func cloudProjectKubeNodePoolExists(serviceName, kubeId, id string, client *ovhwrap.Client) error {
-	res := &CloudProjectKubeNodePoolResponse{}
+// autoscalingOptsFromModel builds autoscaling opts from the model.
+func autoscalingOptsFromModel(data *cloudProjectKubeNodePoolResourceModel) *CloudProjectKubeNodePoolAutoscaling {
+	var autoscaling CloudProjectKubeNodePoolAutoscaling
+	hasValue := false
 
-	endpoint := fmt.Sprintf("/cloud/project/%s/kube/%s/nodepool/%s", serviceName, kubeId, id)
-	return client.Get(endpoint, res)
+	if !data.AutoscalingScaleDownUnneededTimeSeconds.IsNull() && !data.AutoscalingScaleDownUnneededTimeSeconds.IsUnknown() {
+		v := int(data.AutoscalingScaleDownUnneededTimeSeconds.ValueInt64())
+		autoscaling.ScaleDownUnneededTimeSeconds = &v
+		hasValue = true
+	}
+
+	if !data.AutoscalingScaleDownUnreadyTimeSeconds.IsNull() && !data.AutoscalingScaleDownUnreadyTimeSeconds.IsUnknown() {
+		v := int(data.AutoscalingScaleDownUnreadyTimeSeconds.ValueInt64())
+		autoscaling.ScaleDownUnreadyTimeSeconds = &v
+		hasValue = true
+	}
+
+	if !data.AutoscalingScaleDownUtilizationThreshold.IsNull() && !data.AutoscalingScaleDownUtilizationThreshold.IsUnknown() {
+		bf := data.AutoscalingScaleDownUtilizationThreshold.ValueBigFloat()
+		if bf != nil {
+			f, _ := bf.Float64()
+			autoscaling.ScaleDownUtilizationThreshold = &f
+			hasValue = true
+		}
+	}
+
+	if !hasValue {
+		return nil
+	}
+	return &autoscaling
 }
 
-func waitForCloudProjectKubeNodePoolWithStateTarget(client *ovhwrap.Client, serviceName, kubeId, id string, timeout time.Duration, stateTargets []string) error {
-	stateConf := &resource.StateChangeConf{
-		Pending: []string{"INSTALLING", "UPDATING", "REDEPLOYING", "RESIZING", "DOWNSCALING", "UPSCALING", "UNKNOWN"},
-		Target:  stateTargets,
-		Refresh: func() (interface{}, string, error) {
-			res := &CloudProjectKubeNodePoolResponse{}
-			endpoint := fmt.Sprintf("/cloud/project/%s/kube/%s/nodepool/%s", serviceName, kubeId, id)
-			err := client.Get(endpoint, res)
-			if err != nil {
-				return res, "", err
+// templateFromModel converts a NodePoolTemplateValue to the API struct.
+func templateFromModel(tmpl NodePoolTemplateValue) *CloudProjectKubeNodePoolTemplate {
+	if tmpl.IsNull() || tmpl.IsUnknown() {
+		return nil
+	}
+
+	template := &CloudProjectKubeNodePoolTemplate{
+		Metadata: CloudProjectKubeNodePoolTemplateMetadata{
+			Annotations: make(map[string]string),
+			Finalizers:  make([]string, 0),
+			Labels:      make(map[string]string),
+		},
+		Spec: CloudProjectKubeNodePoolTemplateSpec{
+			Taints:        make([]Taint, 0),
+			Unschedulable: false,
+		},
+	}
+
+	// Metadata
+	if !tmpl.Metadata.IsNull() && !tmpl.Metadata.IsUnknown() {
+		// Annotations
+		for k, v := range tmpl.Metadata.Annotations.Elements() {
+			template.Metadata.Annotations[k] = v.(ovhtypes.TfStringValue).ValueString()
+		}
+		// Finalizers
+		for _, v := range tmpl.Metadata.Finalizers.Elements() {
+			template.Metadata.Finalizers = append(template.Metadata.Finalizers, v.(ovhtypes.TfStringValue).ValueString())
+		}
+		// Labels
+		for k, v := range tmpl.Metadata.Labels.Elements() {
+			template.Metadata.Labels[k] = v.(ovhtypes.TfStringValue).ValueString()
+		}
+	}
+
+	// Spec
+	if !tmpl.Spec.IsNull() && !tmpl.Spec.IsUnknown() {
+		if !tmpl.Spec.Unschedulable.IsNull() && !tmpl.Spec.Unschedulable.IsUnknown() {
+			template.Spec.Unschedulable = tmpl.Spec.Unschedulable.ValueBool()
+		}
+
+		for _, elem := range tmpl.Spec.Taints.Elements() {
+			taintVal := elem.(NodePoolTaintValue)
+			effectStr := taintVal.Effect.ValueString()
+			effect := TaintEffecTypeToID[effectStr]
+
+			taint := Taint{
+				Effect: effect,
+				Key:    taintVal.Key.ValueString(),
+			}
+			if !taintVal.Value.IsNull() && !taintVal.Value.IsUnknown() {
+				taint.Value = taintVal.Value.ValueString()
 			}
 
-			return res, res.Status, nil
-		},
-		Timeout:    timeout,
-		Delay:      5 * time.Second,
-		MinTimeout: 3 * time.Second,
+			template.Spec.Taints = append(template.Spec.Taints, taint)
+		}
 	}
 
-	_, err := stateConf.WaitForState()
+	return template
+}
+
+// stringSliceFromTfList extracts a []string from a TfListNestedValue[TfStringValue].
+func stringSliceFromTfList(list ovhtypes.TfListNestedValue[ovhtypes.TfStringValue]) []string {
+	elems := list.Elements()
+	result := make([]string, 0, len(elems))
+	for _, elem := range elems {
+		result = append(result, elem.(ovhtypes.TfStringValue).ValueString())
+	}
+	return result
+}
+
+// --- Waiters ---
+
+func waitForCloudProjectKubeNodePoolReadyCtx(ctx context.Context, client *ovhwrap.Client, serviceName, kubeId, id string, timeout time.Duration) error {
+	err := retry.RetryContext(ctx, timeout, func() *retry.RetryError {
+		res := &CloudProjectKubeNodePoolResponse{}
+		endpoint := fmt.Sprintf("/cloud/project/%s/kube/%s/nodepool/%s",
+			url.PathEscape(serviceName),
+			url.PathEscape(kubeId),
+			url.PathEscape(id),
+		)
+		if err := client.GetWithContext(ctx, endpoint, res); err != nil {
+			return retry.NonRetryableError(fmt.Errorf("error reading nodepool %s: %w", id, err))
+		}
+
+		if res.Status == "READY" {
+			return nil
+		}
+		if res.Status == "ERROR" {
+			return retry.NonRetryableError(fmt.Errorf("nodepool %s is in ERROR state", id))
+		}
+
+		return retry.RetryableError(fmt.Errorf("nodepool %s is in state %s, waiting for READY", id, res.Status))
+	})
 	return err
 }
 
-func waitForCloudProjectKubeNodePoolDeleted(client *ovhwrap.Client, serviceName, kubeId, id string, timeout time.Duration) error {
-	stateConf := &resource.StateChangeConf{
-		Pending: []string{"DELETING"},
-		Target:  []string{"DELETED"},
-		Refresh: func() (interface{}, string, error) {
-			res := &CloudProjectKubeNodePoolResponse{}
-			endpoint := fmt.Sprintf("/cloud/project/%s/kube/%s/nodepool/%s", serviceName, kubeId, id)
-			err := client.Get(endpoint, res)
-			if err != nil {
-				if errOvh, ok := err.(*ovh.APIError); ok && errOvh.Code == 404 {
-					return res, "DELETED", nil
-				} else {
-					return res, "", err
-				}
+func waitForCloudProjectKubeNodePoolDeletedCtx(ctx context.Context, client *ovhwrap.Client, serviceName, kubeId, id string, timeout time.Duration) error {
+	err := retry.RetryContext(ctx, timeout, func() *retry.RetryError {
+		res := &CloudProjectKubeNodePoolResponse{}
+		endpoint := fmt.Sprintf("/cloud/project/%s/kube/%s/nodepool/%s",
+			url.PathEscape(serviceName),
+			url.PathEscape(kubeId),
+			url.PathEscape(id),
+		)
+		if err := client.GetWithContext(ctx, endpoint, res); err != nil {
+			if errOvh, ok := err.(*ovh.APIError); ok && errOvh.Code == 404 {
+				return nil
 			}
+			return retry.NonRetryableError(fmt.Errorf("error reading nodepool %s: %w", id, err))
+		}
 
-			return res, res.Status, nil
-		},
-		Timeout:    timeout,
-		Delay:      5 * time.Second,
-		MinTimeout: 3 * time.Second,
-	}
-
-	_, err := stateConf.WaitForState()
+		return retry.RetryableError(fmt.Errorf("nodepool %s is in state %s, waiting for deletion", id, res.Status))
+	})
 	return err
 }
